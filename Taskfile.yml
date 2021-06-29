@@ -1,0 +1,12 @@
+version: '3'
+
+tasks:
+  test:
+    cmds:
+      - go test ./... -tags=unit
+    sources:
+    - ./**/*.go
+
+  test:integration:
+    cmds:
+      - docker-compose run --rm go go test ./...

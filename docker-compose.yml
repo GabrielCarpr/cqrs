@@ -1,0 +1,25 @@
+version: '3.6'
+
+services:
+  db:
+    image: postgres:13.2
+    ports:
+    - 5432:5432
+    environment:
+      POSTGRES_DB: cqrs
+      POSTGRES_USER: cqrs
+      POSTGRES_PASSWORD: cqrs
+      PGDATA: /var/lib/postgresql/data
+    tmpfs: /var/lib/postgresql/data
+
+  go:
+    image: golang:1.16.5
+    volumes:
+      - ./:/src
+      - go-deps:/go/pkg
+    working_dir: /src
+    depends_on: 
+      - db
+
+volumes:
+  go-deps: {}
