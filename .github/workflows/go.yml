@@ -8,7 +8,7 @@ on:
 
 jobs:
 
-  build:
+  unit:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -20,3 +20,24 @@ jobs:
 
     - name: Unit Test
       run: go test -v ./... -tags=unit
+
+  integration:
+    runs-on: ubuntu-latest
+    container: golang:1.16.5
+    services:
+      db:
+        image: postgres:13.2
+        env:
+          POSTGRES_USER: cqrs
+          POSTGRES_PASSWORD: cqrs
+          POSTGRES_DB: cqrs
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Integration test
+        run: go test -v ./...
