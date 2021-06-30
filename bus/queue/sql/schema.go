@@ -1,7 +1,10 @@
 package sql
 
 import (
+	"log"
 	"strings"
+
+	stdSQL "database/sql"
 
 	wmSql "github.com/ThreeDotsLabs/watermill-sql/pkg/sql"
 )
@@ -23,4 +26,16 @@ func (s PostgreSQLSchema) SchemaInitializingQueries(topic string) []string {
 	}, "\n")
 
 	return []string{createMessagesTable}
+}
+
+func ResetSQLDB(dsn string) {
+	log.Print("Resetting SQL queue database")
+	db, err := stdSQL.Open("postgres", dsn)
+	if err != nil {
+		panic(err)
+	}
+	_, err = db.Exec("DELETE FROM watermill_messages")
+	if err != nil {
+		panic(err)
+	}
 }

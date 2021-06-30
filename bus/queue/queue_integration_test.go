@@ -38,7 +38,7 @@ func (TestConfig) DBDsn() string {
 	return "user=cqrs password=cqrs dbname=cqrs host=db sslmode=disable"
 }
 
-func TestQueueIntegrationTest(t *testing.T) {
+func TestSQLQueueIntegrationTest(t *testing.T) {
 	suite.Run(t, &QueueIntegrationTest{queue: sql.NewSQLQueue(TestConfig{})})
 }
 
@@ -49,6 +49,7 @@ type QueueIntegrationTest struct {
 }
 
 func (s *QueueIntegrationTest) SetupTest() {
+	sql.ResetSQLDB(TestConfig{}.DBDsn())
 	s.queue.RegisterCtxKey(log.CtxIDKey, func(b []byte) interface{} {
 		return uuid.MustParse(string(b))
 	})

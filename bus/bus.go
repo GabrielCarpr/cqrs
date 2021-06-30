@@ -81,11 +81,11 @@ func (b *Bus) Close() {
 	Instance = nil
 }
 
-func (b *Bus) Work() {
+func (b *Bus) Work(busCtx context.Context) {
 	for _, work := range b.workers {
 		work()
 	}
-	b.queue.Subscribe(context.Background(), func(ctx context.Context, msg message.Message) error {
+	b.queue.Subscribe(busCtx, func(ctx context.Context, msg message.Message) error {
 		return b.routeFromQueue(ctx, msg)
 	})
 }

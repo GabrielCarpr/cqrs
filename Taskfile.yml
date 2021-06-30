@@ -5,8 +5,14 @@ tasks:
     cmds:
       - go test ./... -tags=unit
     sources:
-    - ./**/*.go
+      - ./**/*.go
 
   test:integration:
     cmds:
-      - docker-compose run --rm go go test ./...
+      - docker-compose run go go test ./... {{ .CLI_ARGS }}
+
+  build:
+    cmds:
+      - go build .
+    sources:
+      - ./**/*.go
