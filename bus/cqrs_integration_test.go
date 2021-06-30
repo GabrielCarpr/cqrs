@@ -5,9 +5,9 @@ package bus_test
 import (
 	"context"
 	"fmt"
-	"github.com/gabrielcarpr/cqrs/bus"
-	"github.com/gabrielcarpr/cqrs/bus/message"
-	"github.com/gabrielcarpr/cqrs/bus/queue/sql"
+	"github.com/GabrielCarpr/cqrs/bus"
+	"github.com/GabrielCarpr/cqrs/bus/message"
+	"github.com/GabrielCarpr/cqrs/bus/queue/sql"
 	"testing"
 	"time"
 

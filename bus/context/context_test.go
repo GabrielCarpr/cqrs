@@ -3,7 +3,7 @@ package context_test
 import (
 	"context"
 	"encoding/json"
-	cs "github.com/gabrielcarpr/cqrs/bus/context"
+	cs "github.com/GabrielCarpr/cqrs/bus/context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"

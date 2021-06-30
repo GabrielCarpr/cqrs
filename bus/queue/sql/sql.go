@@ -6,15 +6,15 @@ import (
 	stdSQL "database/sql"
 	"encoding/gob"
 	"fmt"
-	"github.com/gabrielcarpr/cqrs/log"
+	"github.com/GabrielCarpr/cqrs/log"
 	stdlog "log"
 	"time"
 
 	_ "github.com/lib/pq"
 
-	"github.com/gabrielcarpr/cqrs/bus/config"
-	ctxSx "github.com/gabrielcarpr/cqrs/bus/context"
-	"github.com/gabrielcarpr/cqrs/bus/message"
+	"github.com/GabrielCarpr/cqrs/bus/config"
+	ctxSx "github.com/GabrielCarpr/cqrs/bus/context"
+	"github.com/GabrielCarpr/cqrs/bus/message"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill-sql/pkg/sql"

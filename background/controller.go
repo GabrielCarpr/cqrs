@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gabrielcarpr/cqrs/bus"
-	"github.com/gabrielcarpr/cqrs/bus/message"
+	"github.com/GabrielCarpr/cqrs/bus"
+	"github.com/GabrielCarpr/cqrs/bus/message"
 	"log"
 	"os"
 	"os/signal"
@@ -239,8 +239,11 @@ type backgroundCtxKey string
 
 var jobID backgroundCtxKey = "JobID"
 
+// JobFinishingMiddleware hooks into the bus's command execution
+// stack and allows it to report to the controller about the jobs execution status when it passes through.
+// Should be inserted ABOVE recovery middleware so that panics don't stop job status being reported
 func (c *Controller) JobFinishingMiddleware(next bus.CommandHandler) bus.CommandHandler {
-	return bus.CmdFunc(func(ctx context.Context, cmd bus.Command) (res bus.CommandResponse, msgs []message.Message) {
+	return bus.CmdMiddlewareFunc(func(ctx context.Context, cmd bus.Command) (res bus.CommandResponse, msgs []message.Message) {
 		j := ctx.Value(jobID)
 		if j == nil {
 			return next.Execute(ctx, cmd)

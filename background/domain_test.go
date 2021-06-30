@@ -1,7 +1,7 @@
 package background
 
 import (
-	"github.com/gabrielcarpr/cqrs/bus"
+	"github.com/GabrielCarpr/cqrs/bus"
 	"testing"
 	"time"
 

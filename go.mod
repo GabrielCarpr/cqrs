@@ -1,4 +1,4 @@
-module github.com/gabrielcarpr/cqrs
+module github.com/GabrielCarpr/cqrs
 
 go 1.16
 

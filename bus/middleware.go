@@ -2,16 +2,27 @@ package bus
 
 import (
 	"context"
-	"github.com/gabrielcarpr/cqrs/bus/message"
-	"github.com/gabrielcarpr/cqrs/log"
+	"github.com/GabrielCarpr/cqrs/bus/message"
+	"github.com/GabrielCarpr/cqrs/log"
 )
 
 /*
+* TODO: Add new middleware
+* - External error checking and hiding
+* - Panic recovery
+* - Auth/access control guard
+
+/*
  * Guards
+ * TODO: Add tests
 **/
 
+// CommandGuard allows runtime composition of code to test commands
+// before being routed to a handler. Intended for use with validation and access control.
+// Will always run before a command is queued
 type CommandGuard = func(context.Context, Command) (context.Context, Command, error)
 
+// CommandValidationGuard checks a command is valid before being executed, and returns an error if not
 func CommandValidationGuard(ctx context.Context, c Command) (context.Context, Command, error) {
 	err := c.Valid()
 	if err != nil {
@@ -21,8 +32,11 @@ func CommandValidationGuard(ctx context.Context, c Command) (context.Context, Co
 	return ctx, c, nil
 }
 
+// QueryGuard allows runtime composition of code to test queries before being
+// routed to a handler. Intended for use with validation and access control.
 type QueryGuard = func(context.Context, Query) (context.Context, Query, error)
 
+// QueryValidationGuard ensures a query is valid before being routed to a handler
 func QueryValidationGuard(ctx context.Context, q Query) (context.Context, Query, error) {
 	err := q.Valid()
 	if err != nil {
@@ -33,62 +47,66 @@ func QueryValidationGuard(ctx context.Context, q Query) (context.Context, Query,
 
 /*
  * Command Middleware
+ * TODO: Add tests
  */
 
-type BaseCommandMiddleware struct {
+type baseCommandMiddleware struct {
 	ExecuteMethod func(context.Context, Command) (CommandResponse, []message.Message)
 }
 
-func (m BaseCommandMiddleware) Execute(ctx context.Context, c Command) (CommandResponse, []message.Message) {
+func (m baseCommandMiddleware) Execute(ctx context.Context, c Command) (CommandResponse, []message.Message) {
 	return m.ExecuteMethod(ctx, c)
 }
 
-func CmdFunc(fn func(context.Context, Command) (CommandResponse, []message.Message)) CommandHandler {
-	handler := struct{ BaseCommandMiddleware }{}
+// CmdMiddlewareFunc is used for creating middleware with a function
+func CmdMiddlewareFunc(fn func(context.Context, Command) (CommandResponse, []message.Message)) CommandHandler {
+	handler := struct{ baseCommandMiddleware }{}
 	handler.ExecuteMethod = fn
 	return handler
 }
 
+// CommandMiddleware allows access to a command before and after it's executed by a handler
 type CommandMiddleware = func(CommandHandler) CommandHandler
 
+// CommandLoggingMiddleware logs before and after a command is executed by it's handler
 func CommandLoggingMiddleware(next CommandHandler) CommandHandler {
-	return CmdFunc(func(ctx context.Context, c Command) (res CommandResponse, msgs []message.Message) {
-		log.Info(ctx, "Executing command", log.F{"command": c.Command()})
+	return CmdMiddlewareFunc(func(ctx context.Context, c Command) (res CommandResponse, msgs []message.Message) {
+		log.Info(ctx, "Executing command", log.F{"command": string(c.Command())})
+		defer log.Info(ctx, "Finished executing command", log.F{"command": string(c.Command())})
 
-		res, msgs = next.Execute(ctx, c)
-
-		log.Info(ctx, "Finished executing command", log.F{"command": c.Command()})
-		return
+		return next.Execute(ctx, c)
 	})
 }
 
 /*
  * Query middleware
+ * TODO: Add tests
  */
 
-type BaseQueryMiddleware struct {
+type baseQueryMiddleware struct {
 	ExecuteMethod func(context.Context, Query, interface{}) error
 }
 
-func (m BaseQueryMiddleware) Execute(ctx context.Context, q Query, result interface{}) error {
+func (m baseQueryMiddleware) Execute(ctx context.Context, q Query, result interface{}) error {
 	return m.ExecuteMethod(ctx, q, result)
 }
 
-func QueryFunc(fn func(context.Context, Query, interface{}) error) QueryHandler {
-	handler := struct{ BaseQueryMiddleware }{}
+// QueryMiddlewareFunc allows construction of a QueryMiddleware
+func QueryMiddlewareFunc(fn func(context.Context, Query, interface{}) error) QueryHandler {
+	handler := struct{ baseQueryMiddleware }{}
 	handler.ExecuteMethod = fn
 	return handler
 }
 
+// QueryMiddleware allows access to a query before and after it's executed
 type QueryMiddleware = func(QueryHandler) QueryHandler
 
+// QueryLoggingMiddleware logs the query before and after it's executed
 func QueryLoggingMiddleware(next QueryHandler) QueryHandler {
-	return QueryFunc(func(ctx context.Context, q Query, res interface{}) (err error) {
+	return QueryMiddlewareFunc(func(ctx context.Context, q Query, res interface{}) (err error) {
 		log.Info(ctx, "Executing query", log.F{"query": q.Query()})
+		defer log.Info(ctx, "Finished executing query", log.F{"query": q.Query()})
 
-		err = next.Execute(ctx, q, res)
-
-		log.Info(ctx, "Finished executing query", log.F{"query": q.Query()})
-		return
+		return next.Execute(ctx, q, res)
 	})
 }

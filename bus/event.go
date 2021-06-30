@@ -2,25 +2,30 @@ package bus
 
 import (
 	"context"
-	"github.com/gabrielcarpr/cqrs/bus/message"
+	"github.com/GabrielCarpr/cqrs/bus/message"
 )
 
-// Event is a routable event
+// Event is a routable event indicating something has happened.
+// Events are fanned out to both sync and async handlers
 type Event interface {
 	message.Message
+
+	// OwnedBy tells the event which entity the event originated from
 	OwnedBy(interface{ String() string })
+
+	// Event returns the events name. Must be implemented by all events
 	Event() string
 }
 
-// EventType is a record of something that has happened.
-// Once routed, the event is fanned out to multiple
-// handlers
+// EventType is a struct designed to be embedded within an event,
+// providing some basic behaviours
 type EventType struct {
 	Owner string
 }
 
-func (e EventType) MessageType() string {
-	return "event"
+// MessageType satisfies the message.Message interface, used for routing
+func (e EventType) MessageType() message.Type {
+	return message.Event
 }
 
 // OwnedBy is the owning entity of the event
@@ -35,6 +40,7 @@ type EventHandler interface {
 	Async() bool
 }
 
+// NewEventQueue returns an owned event queue
 func NewEventQueue(owner interface{ String() string }) EventQueue {
 	return EventQueue{
 		owner: owner,
@@ -43,12 +49,17 @@ func NewEventQueue(owner interface{ String() string }) EventQueue {
 
 // Event Queue
 
+// EventQueue is embedded in entities to buffer events before
+// being released to infrastructure
+// TODO: Add entity versioning
 type EventQueue struct {
 	owner     interface{ String() string }
-	events    []message.Message
+	events    []Event
 	GobEncode bool // Unused, purely to make Gob encode the eventqueue and not fail.
 }
 
+// Publish adds events to the buffer queue,
+// and sets their owner simutaneously
 func (e *EventQueue) Publish(events ...Event) {
 	for _, event := range events {
 		event.OwnedBy(e.owner)
@@ -56,11 +67,12 @@ func (e *EventQueue) Publish(events ...Event) {
 	}
 }
 
-func (e *EventQueue) Release() []message.Message {
-	output := make([]message.Message, len(e.events))
+// Release empties the event queue, returning
+func (e *EventQueue) Release() []Event {
+	output := make([]Event, len(e.events))
 	for i, event := range e.events {
 		output[i] = event
 	}
-	e.events = make([]message.Message, 0)
+	e.events = make([]Event, 0)
 	return output
 }

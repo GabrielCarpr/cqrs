@@ -3,7 +3,7 @@ package background
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/gabrielcarpr/cqrs/bus"
+	"github.com/GabrielCarpr/cqrs/bus"
 	"time"
 
 	"github.com/google/uuid"

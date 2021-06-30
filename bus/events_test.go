@@ -1,7 +1,7 @@
 package bus_test
 
 import (
-	"github.com/gabrielcarpr/cqrs/bus"
+	"github.com/GabrielCarpr/cqrs/bus"
 	"testing"
 
 	"github.com/google/uuid"

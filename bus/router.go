@@ -7,27 +7,29 @@ import (
 
 // CommandRules is a map that determines routing for a command.
 // The key is the command name, and the value is the DI handler name.
+// TODO: Change into routing composition
 type CommandRules map[Command]string
 
 type commandRules map[string]string
 
 func (r commandRules) Merge(rules CommandRules) commandRules {
 	for cmd, handler := range rules {
-		r[cmd.Command()] = handler
+		r[string(cmd.Command())] = handler
 	}
 	return r
 }
 
 // EventRules is a map that determines routing for an event.
 // The key is the event name, and the value is a list of DI handler names.
+// TODO: Change into routing composition
 type EventRules map[Event][]string
 
 type eventRules map[string][]string
 
 func (r eventRules) Merge(rules EventRules) eventRules {
 	for event, handlers := range rules {
-		existing, _ := r[event.Event()]
-		r[event.Event()] = r.deduplicate(existing, handlers...)
+		existing, _ := r[string(event.Event())]
+		r[string(event.Event())] = r.deduplicate(existing, handlers...)
 	}
 	return r
 }
@@ -48,6 +50,7 @@ one:
 }
 
 // QueryRules is a map of queries and query handlers
+// TODO: Change into routing composition
 type QueryRules map[Query]string
 
 type queryRules map[string]string
@@ -59,6 +62,7 @@ func (r queryRules) Merge(rules QueryRules) queryRules {
 	return r
 }
 
+// NewMessageRouter returns a new, empty, message router
 func NewMessageRouter() MessageRouter {
 	return MessageRouter{
 		Events:   make(eventRules),
@@ -67,13 +71,18 @@ func NewMessageRouter() MessageRouter {
 	}
 }
 
-// MessageRouter routes a command to the correct destination
+// MessageRouter routes a message to its correct destination.
+// TODO: Somehow support command specific middleware - what use case?
+// TODO: Change to composition based routing, rather than table based,
+// which will allow grouping and middlewares
 type MessageRouter struct {
 	Events   eventRules
 	Commands commandRules
 	Queries  queryRules
 }
 
+// Extend takes EventRules|CommandRules|QueryRules and extends
+// the routers internal routing rules with it
 func (r *MessageRouter) Extend(rules interface{}) {
 	switch v := rules.(type) {
 	case EventRules:
@@ -93,19 +102,19 @@ func (r *MessageRouter) Extend(rules interface{}) {
 func (r MessageRouter) Route(m interface{}) []string {
 	switch m := m.(type) {
 	case Command:
-		handler, ok := r.Commands[m.Command()]
+		handler, ok := r.Commands[string(m.Command())]
 		if !ok {
 			return []string{}
 		}
 		return []string{handler}
 	case Event:
-		handlers, ok := r.Events[m.Event()]
+		handlers, ok := r.Events[string(m.Event())]
 		if !ok {
 			return []string{}
 		}
 		return handlers
 	case Query:
-		handler, ok := r.Queries[m.Query()]
+		handler, ok := r.Queries[string(m.Query())]
 		if !ok {
 			return []string{}
 		}

@@ -4,10 +4,10 @@ package queue_test
 
 import (
 	"encoding/gob"
-	"github.com/gabrielcarpr/cqrs/bus"
-	"github.com/gabrielcarpr/cqrs/bus/message"
-	"github.com/gabrielcarpr/cqrs/bus/queue/sql"
-	"github.com/gabrielcarpr/cqrs/log"
+	"github.com/GabrielCarpr/cqrs/bus"
+	"github.com/GabrielCarpr/cqrs/bus/message"
+	"github.com/GabrielCarpr/cqrs/bus/queue/sql"
+	"github.com/GabrielCarpr/cqrs/log"
 	"time"
 
 	"context"
