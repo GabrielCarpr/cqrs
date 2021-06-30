@@ -2,8 +2,8 @@ package background
 
 import (
 	"bytes"
-	"cqrs/bus"
 	"encoding/gob"
+	"github.com/gabrielcarpr/cqrs/bus"
 	"time"
 
 	"github.com/google/uuid"

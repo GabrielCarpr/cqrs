@@ -2,12 +2,12 @@ package bus
 
 import (
 	"context"
-	"cqrs/bus/config"
-	"cqrs/bus/message"
-	"cqrs/bus/queue/sql"
-	"cqrs/log"
 	"encoding/gob"
 	"fmt"
+	"github.com/gabrielcarpr/cqrs/bus/config"
+	"github.com/gabrielcarpr/cqrs/bus/message"
+	"github.com/gabrielcarpr/cqrs/bus/queue/sql"
+	"github.com/gabrielcarpr/cqrs/log"
 	stdlog "log"
 	"reflect"
 

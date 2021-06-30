@@ -4,10 +4,10 @@ package bus_test
 
 import (
 	"context"
-	"cqrs/bus"
-	"cqrs/bus/message"
-	"cqrs/bus/queue/sql"
 	"fmt"
+	"github.com/gabrielcarpr/cqrs/bus"
+	"github.com/gabrielcarpr/cqrs/bus/message"
+	"github.com/gabrielcarpr/cqrs/bus/queue/sql"
 	"testing"
 	"time"
 

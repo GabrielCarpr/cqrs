@@ -2,8 +2,8 @@ package bus
 
 import (
 	"context"
-	"cqrs/bus/message"
-	"cqrs/log"
+	"github.com/gabrielcarpr/cqrs/bus/message"
+	"github.com/gabrielcarpr/cqrs/log"
 )
 
 /*

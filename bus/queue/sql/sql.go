@@ -3,18 +3,18 @@ package sql
 import (
 	"bytes"
 	"context"
-	"cqrs/log"
 	stdSQL "database/sql"
 	"encoding/gob"
 	"fmt"
+	"github.com/gabrielcarpr/cqrs/log"
 	stdlog "log"
 	"time"
 
 	_ "github.com/lib/pq"
 
-	"cqrs/bus/config"
-	ctxSx "cqrs/bus/context"
-	"cqrs/bus/message"
+	"github.com/gabrielcarpr/cqrs/bus/config"
+	ctxSx "github.com/gabrielcarpr/cqrs/bus/context"
+	"github.com/gabrielcarpr/cqrs/bus/message"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill-sql/pkg/sql"

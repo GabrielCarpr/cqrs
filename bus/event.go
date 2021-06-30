@@ -2,7 +2,7 @@ package bus
 
 import (
 	"context"
-	"cqrs/bus/message"
+	"github.com/gabrielcarpr/cqrs/bus/message"
 )
 
 // Event is a routable event

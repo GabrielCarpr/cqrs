@@ -2,10 +2,10 @@ package background
 
 import (
 	"context"
-	"cqrs/bus"
-	"cqrs/bus/message"
 	"errors"
 	"fmt"
+	"github.com/gabrielcarpr/cqrs/bus"
+	"github.com/gabrielcarpr/cqrs/bus/message"
 	"log"
 	"os"
 	"os/signal"

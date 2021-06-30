@@ -2,8 +2,8 @@ package context_test
 
 import (
 	"context"
-	cs "cqrs/bus/context"
 	"encoding/json"
+	cs "github.com/gabrielcarpr/cqrs/bus/context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"

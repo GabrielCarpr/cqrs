@@ -2,7 +2,7 @@ package bus
 
 import (
 	"context"
-	"cqrs/bus/message"
+	"github.com/gabrielcarpr/cqrs/bus/message"
 )
 
 // Command is a value object instructing the system to change state.

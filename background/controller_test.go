@@ -4,8 +4,8 @@ package background
 
 import (
 	"context"
-	"cqrs/bus"
 	"encoding/gob"
+	"github.com/gabrielcarpr/cqrs/bus"
 	"testing"
 	"time"
 

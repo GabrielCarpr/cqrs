@@ -3,11 +3,11 @@
 package queue_test
 
 import (
-	"cqrs/bus"
-	"cqrs/bus/message"
-	"cqrs/bus/queue/sql"
-	"cqrs/log"
 	"encoding/gob"
+	"github.com/gabrielcarpr/cqrs/bus"
+	"github.com/gabrielcarpr/cqrs/bus/message"
+	"github.com/gabrielcarpr/cqrs/bus/queue/sql"
+	"github.com/gabrielcarpr/cqrs/log"
 	"time"
 
 	"context"
