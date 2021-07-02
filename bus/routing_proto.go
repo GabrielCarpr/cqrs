@@ -65,25 +65,38 @@ func (Module2) Queries(b QueryBuilder) {
 }*/
 
 func NewCommandContext() *CommandContext {
-	return &CommandContext{routes{}}
+	return &CommandContext{commands: Routes{}}
 }
 
 type CommandContext struct {
-	routes routes
+	middlewares []CommandMiddleware
+	commands    Routes
 }
 
-func (c CommandContext) Routes() routes {
-	return c.routes
+func (c CommandContext) Route(cmd Command) (Route, bool) {
+	r, ok := c.commands[cmd.Command()]
+	if ok {
+		return Route{
+			Command:    r.Command,
+			Handler:    r.Handler,
+			Middleware: c.middlewares,
+		}, true
+	}
+	return Route{}, false
 }
 
 func (c *CommandContext) Command(cmd Command) Record {
 	r := &RoutingRecord{Command: cmd}
-	c.routes[cmd.Command()] = r
+	c.commands[cmd.Command()] = r
 	return r
 }
 
+func (c *CommandContext) Use(middlewares ...CommandMiddleware) {
+	c.middlewares = append(c.middlewares, middlewares...)
+}
+
 type CmdBuilder interface {
-	//Use(middlewares ...CommandMiddleware)
+	Use(middlewares ...CommandMiddleware)
 
 	//With(middlewares ...CommandMiddleware) CmdBuilder
 
@@ -92,9 +105,14 @@ type CmdBuilder interface {
 	//Group(func(CmdBuilder))
 }
 
-type routes map[string]*RoutingRecord
-
 type RoutingRecord struct {
+	Command Command
+	Handler CommandHandler
+}
+
+type Routes map[string]*RoutingRecord
+
+type Route struct {
 	Command    Command
 	Middleware []CommandMiddleware
 	Handler    CommandHandler
