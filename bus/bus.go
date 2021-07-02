@@ -20,6 +20,9 @@ type BoundedContext interface {
 	EventRules() EventRules
 	CommandRules() CommandRules
 	QueryRules() QueryRules
+
+	// TODO: Don't inject config, make it a DI service
+	// TODO: Make own internal DI system
 	Services(interface{}) []di.Def
 }
 
@@ -31,6 +34,8 @@ var Instance *Bus
 // TODO: Allow option changing using option functions
 // TODO: Find a better way of passing (or totally discard) config values
 // TODO: Find a better way of configuring the queue
+// TODO: Create own DI container, maybe with code gen, that allows request
+// scoping and control of dependence
 func NewBus(conf interface{}, builder *di.Builder, bcs []BoundedContext) *Bus {
 	for _, bc := range bcs {
 		for _, def := range bc.Services(conf) {
@@ -52,6 +57,9 @@ func NewBus(conf interface{}, builder *di.Builder, bcs []BoundedContext) *Bus {
 		b.ExtendEvents(bc.EventRules())
 		b.ExtendQueries(bc.QueryRules())
 	}
+	// TODO: Add access control middleware back
+	// and generalise access control,
+	// with adapters to use in different ports
 	b.Use(
 		b.queryContainerMiddleware,
 		b.commandContainerMiddleware,
