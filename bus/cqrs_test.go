@@ -92,19 +92,6 @@ func (tq2) Valid() error {
 	return nil
 }
 
-func TestQueryRules(t *testing.T) {
-	rules := queryRules{}
-	rules = rules.Merge(QueryRules{
-		tq{}: "handler",
-	})
-
-	rules = rules.Merge(QueryRules{
-		tq2{}: "anotherhandler",
-	})
-
-	assert.Len(t, rules, 2)
-}
-
 type testCmd struct {
 	CommandType
 
@@ -117,17 +104,6 @@ func (testCmd) Valid() error {
 
 func (testCmd) Command() string {
 	return "testcmd"
-}
-
-func TestRoutesCommands(t *testing.T) {
-	router := NewMessageRouter()
-	router.Extend(CommandRules{
-		testCmd{}: "hello",
-	})
-
-	handlers := router.Route(testCmd{})
-	assert.Len(t, handlers, 1)
-	assert.Equal(t, "hello", handlers[0])
 }
 
 type TestEvent struct {
@@ -144,7 +120,7 @@ func TestRoutesEvents(t *testing.T) {
 		&TestEvent{}: []string{"hello", "bye"},
 	})
 
-	handlers := router.Route(&TestEvent{})
+	handlers := router.RouteEvent(&TestEvent{})
 	assert.Len(t, handlers, 2)
 	assert.Contains(t, handlers, "bye")
 }
@@ -159,15 +135,4 @@ func (testQuery) Query() string {
 
 func (testQuery) Valid() error {
 	return nil
-}
-
-func TestRoutesQueries(t *testing.T) {
-	router := NewMessageRouter()
-	router.Extend(QueryRules{
-		testQuery{}: "hello",
-	})
-
-	handlers := router.Route(testQuery{})
-	assert.Len(t, handlers, 1)
-	assert.Equal(t, "hello", handlers[0])
 }

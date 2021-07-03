@@ -18,8 +18,8 @@ import (
 // TODO: Rename to modules
 type BoundedContext interface {
 	EventRules() EventRules
-	CommandRules() CommandRules
-	QueryRules() QueryRules
+	Commands(CmdBuilder)
+	Queries(QueryBuilder)
 
 	// TODO: Don't inject config, make it a DI service
 	// TODO: Make own internal DI system
@@ -53,9 +53,9 @@ func NewBus(conf interface{}, builder *di.Builder, bcs []BoundedContext) *Bus {
 		deletions: make([]func(), 0),
 	}
 	for _, bc := range bcs {
-		b.ExtendCommands(bc.CommandRules())
 		b.ExtendEvents(bc.EventRules())
-		b.ExtendQueries(bc.QueryRules())
+		b.routes.ExtendCommands(bc.Commands)
+		b.routes.ExtendQueries(bc.Queries)
 	}
 	// TODO: Add access control middleware back
 	// and generalise access control,
@@ -143,25 +143,12 @@ func (b *Bus) ExtendEvents(rules ...EventRules) *Bus {
 	return b
 }
 
-// ExtendCommands extends the Bus CommandRules
-func (b *Bus) ExtendCommands(rules ...CommandRules) *Bus {
-	for _, rule := range rules {
-		for cmd := range rule {
-			stdlog.Printf("Registered command with gob: %s", cmd.Command())
-			gob.Register(&cmd)
-			gob.Register(cmd)
-		}
-		b.routes.Extend(rule)
-	}
-	return b
+func (b *Bus) ExtendCommands(fn func(CmdBuilder)) {
+	b.routes.ExtendCommands(fn)
 }
 
-// ExtendQueries extends the Bus QueryRules
-func (b *Bus) ExtendQueries(rules ...QueryRules) *Bus {
-	for _, rule := range rules {
-		b.routes.Extend(rule)
-	}
-	return b
+func (b *Bus) ExtendQueries(fn func(QueryBuilder)) {
+	b.routes.ExtendQueries(fn)
 }
 
 // RegisterContextKey registers a context key interpretation value for serialization
@@ -239,11 +226,11 @@ func (b *Bus) Dispatch(ctx context.Context, cmd Command, sync bool) (*CommandRes
 		return &CommandResponse{Error: err}, err
 	}
 
-	handlerNames := b.routes.Route(cmd)
-	if len(handlerNames) != 1 {
+	route, ok := b.routes.RouteCommand(cmd)
+	if !ok {
 		return &CommandResponse{}, NoCommandHandler{cmd}
 	}
-	handlerName := handlerNames[0]
+	handlerName := CommandHandlerName(route.Handler)
 
 	if !sync {
 		log.Info(ctx, "Publishing command", log.F{"command": cmd.Command()})
@@ -280,7 +267,7 @@ func (b *Bus) runCmdGuards(ctx context.Context, cmd Command) (context.Context, C
 func (b *Bus) Publish(ctx context.Context, events ...Event) error {
 	var queueables []queuedEvent
 	for _, event := range events {
-		handlerNames := b.routes.Route(event)
+		handlerNames := b.routes.RouteEvent(event)
 		for _, name := range handlerNames {
 			queueables = append(queueables, queuedEvent{event, name})
 		}
@@ -312,11 +299,11 @@ func (b *Bus) Query(ctx context.Context, query Query, result interface{}) error 
 		return err
 	}
 
-	handlerNames := b.routes.Route(query)
-	if len(handlerNames) != 1 {
+	route, exists := b.routes.RouteQuery(query)
+	if !exists {
 		return NoQueryHandler{query}
 	}
-	handlerName := handlerNames[0]
+	handlerName := QueryHandlerName(route.Handler)
 
 	handler := Get(ctx, handlerName).(QueryHandler)
 

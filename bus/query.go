@@ -2,6 +2,9 @@ package bus
 
 import (
 	"context"
+	"fmt"
+	"reflect"
+
 	"github.com/GabrielCarpr/cqrs/bus/message"
 )
 
@@ -43,4 +46,11 @@ type QueryHandler interface {
 	// Execute runs the query, and fills a result provided
 	// in the third argument, which must be a pointer.
 	Execute(context.Context, Query, interface{}) error
+}
+
+// QueryHandlerName returns the name of the handler, used for DI
+// and routing
+func QueryHandlerName(h QueryHandler) string {
+	t := reflect.TypeOf(h)
+	return fmt.Sprint(t.PkgPath(), ".", t.Name())
 }

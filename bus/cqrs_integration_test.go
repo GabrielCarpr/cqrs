@@ -113,14 +113,14 @@ func setupContainer() *di.Builder {
 	builder, _ := di.NewBuilder()
 
 	builder.Add(di.Def{
-		Name: "test-cmd-handler",
+		Name: bus.CommandHandlerName(testCmdHandler{}),
 		Build: func(ctn di.Container) (interface{}, error) {
 			return testCmdHandler{}, nil
 		},
 	})
 
 	builder.Add(di.Def{
-		Name: "test-query-handler",
+		Name: bus.QueryHandlerName(testQueryHandler{}),
 		Build: func(ctn di.Container) (interface{}, error) {
 			return testQueryHandler{}, nil
 		},
@@ -184,8 +184,8 @@ func TestBusHandlesCommands(t *testing.T) {
 	build := setupContainer()
 	b := bus.NewBus(testConfig{}, build, []bus.BoundedContext{})
 	b.Use(bus.CommandValidationGuard)
-	b.ExtendCommands(bus.CommandRules{
-		stringReturnCmd{}: "test-cmd-handler",
+	b.ExtendCommands(func(b bus.CmdBuilder) {
+		b.Command(stringReturnCmd{}).Handled(testCmdHandler{})
 	})
 
 	res, err := b.Dispatch(context.Background(), stringReturnCmd{Return: "hello"}, true)
@@ -222,14 +222,14 @@ func TestBusQueueCommand(t *testing.T) {
 	}
 
 	build.Add(di.Def{
-		Name: "test-queued-cmd-handler",
+		Name: bus.CommandHandlerName(h),
 		Build: func(ctn di.Container) (interface{}, error) {
 			return h, nil
 		},
 	})
 	b := bus.NewBus(testConfig{}, build, []bus.BoundedContext{})
-	b.ExtendCommands(bus.CommandRules{
-		stringReturnCmd{}: "test-queued-cmd-handler",
+	b.ExtendCommands(func(b bus.CmdBuilder) {
+		b.Command(stringReturnCmd{}).Handled(h)
 	})
 
 	res, err := b.Dispatch(context.Background(), stringReturnCmd{Return: "hello"}, false)
@@ -246,8 +246,8 @@ func TestBusHandlesQueries(t *testing.T) {
 	build := setupContainer()
 	b := bus.NewBus(testConfig{}, build, []bus.BoundedContext{})
 	b.Use(bus.QueryValidationGuard)
-	b.ExtendQueries(bus.QueryRules{
-		returnQuery{}: "test-query-handler",
+	b.ExtendQueries(func(b bus.QueryBuilder) {
+		b.Query(returnQuery{}).Handled(testQueryHandler{})
 	})
 
 	var res string

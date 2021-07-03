@@ -1,6 +1,7 @@
 package bus
 
 import (
+	"encoding/gob"
 	"fmt"
 )
 
@@ -21,10 +22,10 @@ type CommandContext struct {
 }
 
 // Route takes a command and returns it's execution route
-func (c CommandContext) Route(cmd Command) (commandRoute, bool) {
+func (c CommandContext) Route(cmd Command) (CommandRoute, bool) {
 	r, ok := c.commands[cmd.Command()]
 	if ok {
-		return commandRoute{
+		return CommandRoute{
 			Command:    r.Command,
 			Handler:    r.Handler,
 			Middleware: c.middlewares,
@@ -38,7 +39,7 @@ func (c CommandContext) Route(cmd Command) (commandRoute, bool) {
 			return r, true
 		}
 	}
-	return commandRoute{}, false
+	return CommandRoute{}, false
 }
 
 // Routes buildings a routing table, a mapping between routable message and
@@ -78,6 +79,8 @@ func (c *CommandContext) Command(cmd Command) commandRecord {
 		panic(fmt.Sprint("Cannot register command twice: ", cmd.Command()))
 	}
 	c.commands[cmd.Command()] = r
+	gob.Register(cmd)
+	gob.Register(&cmd)
 	return r
 }
 
@@ -178,13 +181,13 @@ func (r *commandRoutingRecord) Handled(h CommandHandler) {
 
 type commandRoutes map[string]*commandRoutingRecord
 
-type commandRoute struct {
+type CommandRoute struct {
 	Command    Command
 	Middleware []CommandMiddleware
 	Handler    CommandHandler
 }
 
-type commandRouting map[string]commandRoute
+type commandRouting map[string]CommandRoute
 
 type commandRecord interface {
 	Handled(CommandHandler)
@@ -196,21 +199,21 @@ Query Context
 
 // NewQueryContext creates an initialized QueryContext
 func NewQueryContext() *QueryContext {
-	return &QueryContext{queries: queryRoutes{}}
+	return &QueryContext{queries: QueryRoutes{}}
 }
 
 // QueryContext is a context that command routes are built in
 type QueryContext struct {
 	middlewares []QueryMiddleware
-	queries     queryRoutes
+	queries     QueryRoutes
 	contexts    []*QueryContext
 }
 
 // Route takes a command and returns it's execution route
-func (c QueryContext) Route(q Query) (queryRoute, bool) {
+func (c QueryContext) Route(q Query) (QueryRoute, bool) {
 	r, ok := c.queries[q.Query()]
 	if ok {
-		return queryRoute{
+		return QueryRoute{
 			Query:      r.Query,
 			Handler:    r.Handler,
 			Middleware: c.middlewares,
@@ -224,7 +227,7 @@ func (c QueryContext) Route(q Query) (queryRoute, bool) {
 			return r, true
 		}
 	}
-	return queryRoute{}, false
+	return QueryRoute{}, false
 }
 
 // Routes buildings a routing table, a mapping between routable message and
@@ -360,15 +363,15 @@ func (r *queryRoutingRecord) Handled(h QueryHandler) {
 	r.Handler = h
 }
 
-type queryRoutes map[string]*queryRoutingRecord
+type QueryRoutes map[string]*queryRoutingRecord
 
-type queryRoute struct {
+type QueryRoute struct {
 	Query      Query
 	Middleware []QueryMiddleware
 	Handler    QueryHandler
 }
 
-type queryRouting map[string]queryRoute
+type queryRouting map[string]QueryRoute
 
 type queryRecord interface {
 	Handled(QueryHandler)

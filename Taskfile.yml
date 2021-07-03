@@ -9,7 +9,7 @@ tasks:
 
   test:integration:
     cmds:
-      - docker-compose run go go test ./... {{ .CLI_ARGS }}
+      - docker-compose run --rm go go test ./... {{ .CLI_ARGS }}
 
   build:
     cmds:

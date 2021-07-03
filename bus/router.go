@@ -1,24 +1,5 @@
 package bus
 
-import (
-	"fmt"
-	"reflect"
-)
-
-// CommandRules is a map that determines routing for a command.
-// The key is the command name, and the value is the DI handler name.
-// TODO: Change into routing composition
-type CommandRules map[Command]string
-
-type commandRules map[string]string
-
-func (r commandRules) Merge(rules CommandRules) commandRules {
-	for cmd, handler := range rules {
-		r[string(cmd.Command())] = handler
-	}
-	return r
-}
-
 // EventRules is a map that determines routing for an event.
 // The key is the event name, and the value is a list of DI handler names.
 // TODO: Change into routing composition
@@ -49,25 +30,12 @@ one:
 	return merged
 }
 
-// QueryRules is a map of queries and query handlers
-// TODO: Change into routing composition
-type QueryRules map[Query]string
-
-type queryRules map[string]string
-
-func (r queryRules) Merge(rules QueryRules) queryRules {
-	for query, handler := range rules {
-		r[query.Query()] = handler
-	}
-	return r
-}
-
 // NewMessageRouter returns a new, empty, message router
 func NewMessageRouter() MessageRouter {
 	return MessageRouter{
 		Events:   make(eventRules),
-		Commands: make(commandRules),
-		Queries:  make(queryRules),
+		commands: *NewCommandContext(),
+		queries:  *NewQueryContext(),
 	}
 }
 
@@ -77,50 +45,46 @@ func NewMessageRouter() MessageRouter {
 // which will allow grouping and middlewares
 // TODO: Auto generate documentation of bus
 type MessageRouter struct {
-	Events   eventRules
-	Commands commandRules
-	Queries  queryRules
+	Events        eventRules
+	commands      CommandContext
+	queries       QueryContext
+	commandRoutes commandRouting
+	queryRoutes   queryRouting
 }
 
 // Extend takes EventRules|CommandRules|QueryRules and extends
 // the routers internal routing rules with it
-func (r *MessageRouter) Extend(rules interface{}) {
-	switch v := rules.(type) {
-	case EventRules:
-		r.Events = r.Events.Merge(v)
-		return
-	case CommandRules:
-		r.Commands = r.Commands.Merge(v)
-		return
-	case QueryRules:
-		r.Queries = r.Queries.Merge(v)
-		return
-	}
-	panic(fmt.Sprintf("Tried to extend MessageRouter with non-rules: %s", reflect.TypeOf(rules)))
+func (r *MessageRouter) Extend(rules EventRules) {
+	r.Events = r.Events.Merge(rules)
 }
 
-// Route takes a command or event, and returns it's handlers
-func (r MessageRouter) Route(m interface{}) []string {
-	switch m := m.(type) {
-	case Command:
-		handler, ok := r.Commands[string(m.Command())]
-		if !ok {
-			return []string{}
-		}
-		return []string{handler}
-	case Event:
-		handlers, ok := r.Events[string(m.Event())]
-		if !ok {
-			return []string{}
-		}
-		return handlers
-	case Query:
-		handler, ok := r.Queries[string(m.Query())]
-		if !ok {
-			return []string{}
-		}
-		return []string{handler}
-	default:
-		panic(fmt.Sprintf("Tried to route non command or event: %s", reflect.TypeOf(m)))
+func (r *MessageRouter) ExtendCommands(fn func(b CmdBuilder)) {
+	r.commands.Group(fn)
+	r.commandRoutes = r.commands.Routes()
+}
+
+func (r *MessageRouter) ExtendQueries(fn func(b QueryBuilder)) {
+	r.queries.Group(fn)
+	r.queryRoutes = r.queries.Routes()
+}
+
+// RouteEvent returns all the handlers for an event
+func (r MessageRouter) RouteEvent(e Event) []string {
+	handlers, ok := r.Events[string(e.Event())]
+	if !ok {
+		return []string{}
 	}
+	return handlers
+}
+
+// RouteCommand returns the routing record for a command, if it exists
+func (r MessageRouter) RouteCommand(cmd Command) (CommandRoute, bool) {
+	route, ok := r.commandRoutes[cmd.Command()]
+	return route, ok
+}
+
+// RouteQuery returns the routing record for a query, if it exists
+func (r MessageRouter) RouteQuery(q Query) (QueryRoute, bool) {
+	route, ok := r.queryRoutes[q.Query()]
+	return route, ok
 }

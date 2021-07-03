@@ -34,8 +34,9 @@ func ResetSQLDB(dsn string) {
 	if err != nil {
 		panic(err)
 	}
+
 	_, err = db.Exec("DELETE FROM watermill_messages")
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "does not exist") {
 		panic(err)
 	}
 }

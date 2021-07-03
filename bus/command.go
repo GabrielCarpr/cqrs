@@ -2,6 +2,8 @@ package bus
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 
 	"github.com/GabrielCarpr/cqrs/bus/message"
 )
@@ -49,4 +51,11 @@ type CommandResponse struct {
 type CommandHandler interface {
 	// Execute takes a command and executes the stateful logic it requests.
 	Execute(context.Context, Command) (CommandResponse, []message.Message)
+}
+
+// commandhandlerName returns the name of the command handler, used for
+// routing and DI
+func CommandHandlerName(h CommandHandler) string {
+	t := reflect.TypeOf(h)
+	return fmt.Sprint(t.PkgPath(), ".", t.Name())
 }
