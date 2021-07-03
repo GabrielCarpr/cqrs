@@ -87,7 +87,7 @@ func TestRouteBasicCommandGlobalMiddlewareDeclarative(t *testing.T) {
 	assert.Len(t, c.Middleware, 1)
 }
 
-func TestRouteMultipleMiddleware(t *testing.T) {
+func TestRouteMultipleCmdMiddleware(t *testing.T) {
 	r := bus.NewCommandContext()
 
 	func(b bus.CmdBuilder) {
@@ -103,7 +103,7 @@ func TestRouteMultipleMiddleware(t *testing.T) {
 	assert.Len(t, c.Middleware, 3)
 }
 
-func TestRouteInGroup(t *testing.T) {
+func TestRouteCmdInGroup(t *testing.T) {
 	r := bus.NewCommandContext()
 
 	func(b bus.CmdBuilder) {
@@ -180,7 +180,7 @@ func TestPanicsDuplicateCommands(t *testing.T) {
 	require.True(t, panicked, "Did not panic")
 }
 
-func TestEmptyBuilder(t *testing.T) {
+func TestEmptyCmdBuilder(t *testing.T) {
 	r := bus.NewCommandContext()
 
 	func(b bus.CmdBuilder) {
@@ -188,7 +188,7 @@ func TestEmptyBuilder(t *testing.T) {
 	}(r)
 }
 
-func TestAppliesEachContextMiddleware(t *testing.T) {
+func TestAppliesEachContextCmdMiddleware(t *testing.T) {
 	r := bus.NewCommandContext()
 
 	func(b bus.CmdBuilder) {
@@ -209,7 +209,7 @@ func TestAppliesEachContextMiddleware(t *testing.T) {
 	require.Len(t, c.Middleware, 3)
 }
 
-func TestCreatesRoutingTable(t *testing.T) {
+func TestCreatesCmdRoutingTable(t *testing.T) {
 	r := bus.NewCommandContext()
 
 	func(b bus.CmdBuilder) {
