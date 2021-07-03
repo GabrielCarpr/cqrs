@@ -1,5 +1,9 @@
 package bus
 
+import (
+	"fmt"
+)
+
 // Example module config - v1
 
 /*type Module struct {
@@ -71,6 +75,7 @@ func NewCommandContext() *CommandContext {
 type CommandContext struct {
 	middlewares []CommandMiddleware
 	commands    Routes
+	contexts    []*CommandContext
 }
 
 func (c CommandContext) Route(cmd Command) (Route, bool) {
@@ -82,11 +87,51 @@ func (c CommandContext) Route(cmd Command) (Route, bool) {
 			Middleware: c.middlewares,
 		}, true
 	}
+
+	for _, ctx := range c.contexts {
+		r, ok := ctx.Route(cmd)
+		if ok {
+			r.Middleware = append(r.Middleware, c.middlewares...)
+			return r, true
+		}
+	}
 	return Route{}, false
+}
+
+func (c CommandContext) Routes() Routing {
+	commands := c.flatten()
+	result := make(Routing)
+
+	for _, cmd := range commands {
+		route, ok := c.Route(cmd)
+		if !ok {
+			panic(fmt.Sprint("Could not compute route ", cmd.Command()))
+		}
+		result[cmd.Command()] = route
+	}
+
+	return result
+}
+
+func (c CommandContext) flatten() []Command {
+	cmds := make([]Command, 0)
+
+	for _, r := range c.commands {
+		cmds = append(cmds, r.Command)
+	}
+
+	for _, ctx := range c.contexts {
+		cmds = append(cmds, ctx.flatten()...)
+	}
+	return cmds
 }
 
 func (c *CommandContext) Command(cmd Command) Record {
 	r := &RoutingRecord{Command: cmd}
+	_, exists := c.commands[cmd.Command()]
+	if exists {
+		panic(fmt.Sprint("Cannot register command twice: ", cmd.Command()))
+	}
 	c.commands[cmd.Command()] = r
 	return r
 }
@@ -95,14 +140,31 @@ func (c *CommandContext) Use(middlewares ...CommandMiddleware) {
 	c.middlewares = append(c.middlewares, middlewares...)
 }
 
+func (c *CommandContext) Group(fn func(CmdBuilder)) {
+	subContext := NewCommandContext()
+	fn(subContext)
+	c.contexts = append(c.contexts, subContext)
+}
+
+func (c *CommandContext) With(middlewares ...CommandMiddleware) CmdRegister {
+	subContext := NewCommandContext()
+	subContext.middlewares = middlewares
+	c.contexts = append(c.contexts, subContext)
+	return subContext
+}
+
+type CmdRegister interface {
+	Command(Command) Record
+}
+
 type CmdBuilder interface {
+	CmdRegister
+
 	Use(middlewares ...CommandMiddleware)
 
-	//With(middlewares ...CommandMiddleware) CmdBuilder
+	With(middlewares ...CommandMiddleware) CmdRegister
 
-	Command(Command) Record
-
-	//Group(func(CmdBuilder))
+	Group(func(CmdBuilder))
 }
 
 type RoutingRecord struct {
@@ -116,6 +178,14 @@ type Route struct {
 	Command    Command
 	Middleware []CommandMiddleware
 	Handler    CommandHandler
+}
+
+type Routing map[string]Route
+
+func (r Routing) Merge(new Routing) {
+	for cmd, record := range new {
+		r[cmd] = record
+	}
 }
 
 func (r *RoutingRecord) Handled(h CommandHandler) {
