@@ -228,3 +228,59 @@ func TestCreatesRoutingTable(t *testing.T) {
 	assert.Len(t, routes[routingCmd{}.Command()].Middleware, 1)
 	assert.Len(t, routes[routingCmd2{}.Command()].Middleware, 2)
 }
+
+func TestCannotTakeMultipleCommands(t *testing.T) {
+	r := bus.NewCommandContext()
+	panicked := false
+
+	defer func() {
+		if err := recover(); err != nil {
+			panicked = true
+		}
+	}()
+
+	func(b bus.CmdBuilder) {
+		b.Command(routingCmd{}).Handled(routingCmdHandler{})
+
+		b.Command(routingCmd{}).Handled(routingCmdHandler{})
+	}(r)
+
+	require.True(t, panicked)
+}
+
+func TestSelfTestMultipleCommands(t *testing.T) {
+	r := bus.NewCommandContext()
+
+	func(b bus.CmdBuilder) {
+		b.Command(routingCmd{}).Handled(routingCmdHandler{})
+		b.With().Command(routingCmd{}).Handled(routingCmdHandler{})
+	}(r)
+
+	err := r.SelfTest()
+	require.Error(t, err)
+}
+
+func TestSelfTestMultipleCommandsSiblings(t *testing.T) {
+	r := bus.NewCommandContext()
+
+	func(b bus.CmdBuilder) {
+		b.With().Command(routingCmd{}).Handled(routingCmdHandler{})
+		b.Group(func(b bus.CmdBuilder) {
+			b.Command(routingCmd{}).Handled(routingCmdHandler{})
+		})
+	}(r)
+
+	err := r.SelfTest()
+	require.Error(t, err)
+}
+
+func TestSelfTestCommandNoHandler(t *testing.T) {
+	r := bus.NewCommandContext()
+
+	func(b bus.CmdBuilder) {
+		b.Command(routingCmd{})
+	}(r)
+
+	err := r.SelfTest()
+	require.Error(t, err)
+}

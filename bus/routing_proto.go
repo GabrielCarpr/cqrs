@@ -153,6 +153,55 @@ func (c *CommandContext) With(middlewares ...CommandMiddleware) CmdRegister {
 	return subContext
 }
 
+func (c CommandContext) SelfTest() error {
+	_, err := c.detectMultipleCommands(map[string]struct{}{})
+	if err != nil {
+		return err
+	}
+
+	err = c.detectHandlerlessCommands()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c CommandContext) detectHandlerlessCommands() error {
+	for _, r := range c.commands {
+		if r.Handler == nil {
+			return fmt.Errorf("Command %s has no handler", r.Command.Command())
+		}
+	}
+
+	for _, ctx := range c.contexts {
+		err := ctx.detectHandlerlessCommands()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c CommandContext) detectMultipleCommands(cmds map[string]struct{}) (map[string]struct{}, error) {
+	for cmd := range c.commands {
+		_, exists := cmds[cmd]
+		if exists {
+			return cmds, fmt.Errorf("Command registered twice: %s", cmd)
+		}
+		cmds[cmd] = struct{}{}
+	}
+
+	for _, ctx := range c.contexts {
+		cmds, err := ctx.detectMultipleCommands(cmds)
+		if err != nil {
+			return cmds, err
+		}
+	}
+	return cmds, nil
+}
+
 type CmdRegister interface {
 	Command(Command) Record
 }
