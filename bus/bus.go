@@ -14,18 +14,6 @@ import (
 	"github.com/sarulabs/di/v2"
 )
 
-// BoundedContext represents the integration between the main app and a BC.
-// TODO: Rename to modules
-type BoundedContext interface {
-	EventRules() EventRules
-	Commands(CmdBuilder)
-	Queries(QueryBuilder)
-
-	// TODO: Don't inject config, make it a DI service
-	// TODO: Make own internal DI system
-	Services(interface{}) []di.Def
-}
-
 var Instance *Bus
 
 // NewBus returns a new configured bus.
@@ -36,10 +24,15 @@ var Instance *Bus
 // TODO: Find a better way of configuring the queue
 // TODO: Create own DI container, maybe with code gen, that allows request
 // scoping and control of dependence
-func NewBus(conf interface{}, builder *di.Builder, bcs []BoundedContext) *Bus {
+func NewBus(conf interface{}, bcs []Module) *Bus {
+	if Instance != nil {
+		return Instance
+	}
+
+	builder, _ := di.NewBuilder()
 	for _, bc := range bcs {
-		for _, def := range bc.Services(conf) {
-			builder.Add(def)
+		for _, def := range bc.Services() {
+			builder.Add(def.diDef())
 		}
 	}
 	c := builder.Build()
@@ -135,7 +128,7 @@ func (b *Bus) ExtendEvents(rules ...EventRules) *Bus {
 	for _, rule := range rules {
 		b.routes.Extend(rule)
 		for event := range rule {
-			stdlog.Printf("Registered command with gob: %s", event.Event())
+			stdlog.Printf("Registered event with gob: %s", event.Event())
 			gob.Register(event)
 			gob.Register(&event)
 		}
@@ -242,6 +235,8 @@ func (b *Bus) Dispatch(ctx context.Context, cmd Command, sync bool) (*CommandRes
 	for _, mw := range b.commandMiddleware {
 		handler = mw(handler)
 	}
+
+	log.Info(ctx, "Routed command", log.F{"command": cmd.Command(), "handler": handlerName})
 
 	response, messages := handler.Execute(ctx, cmd)
 	err = b.route(ctx, messages...)

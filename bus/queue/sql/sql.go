@@ -148,7 +148,7 @@ func (q *SQLQueue) process(fn func(context.Context, message.Message) error, msg 
 		}
 	}()
 
-	log.Info(ctx, "Received message", log.F(msg.Metadata))
+	log.Info(ctx, "Received message", log.F{"ID": msg.UUID})
 	if err != nil {
 		msg.Nack()
 		return log.Error(ctx, fmt.Errorf("Failed receiving message: %w", err), log.F{"id": msg.UUID})
@@ -173,7 +173,7 @@ func (q *SQLQueue) Publish(ctx context.Context, msgs ...message.Message) error {
 		}
 		deliver.Metadata = wmMessage.Metadata(q.ctxSerializer.Serialize(ctx))
 
-		log.Info(ctx, "Publishing message", log.F(deliver.Metadata))
+		log.Info(ctx, "Publishing message", log.F{"ID": deliver.UUID})
 		err = q.publisher.Publish("messages", deliver)
 		if err != nil {
 			return err

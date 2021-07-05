@@ -109,24 +109,25 @@ func (stringReturnCmd) Command() string {
 	return "string-return-cmd"
 }
 
-func setupContainer() *di.Builder {
-	builder, _ := di.NewBuilder()
-
-	builder.Add(di.Def{
-		Name: bus.CommandHandlerName(testCmdHandler{}),
-		Build: func(ctn di.Container) (interface{}, error) {
-			return testCmdHandler{}, nil
+func setupContainer() bus.FuncModule {
+	return bus.FuncModule{
+		ServicesFunc: func() []bus.Def {
+			return []bus.Def{
+				{
+					Name: testCmdHandler{},
+					Build: func(ctn di.Container) (interface{}, error) {
+						return testCmdHandler{}, nil
+					},
+				},
+				{
+					Name: testQueryHandler{},
+					Build: func(ctn di.Container) (interface{}, error) {
+						return testQueryHandler{}, nil
+					},
+				},
+			}
 		},
-	})
-
-	builder.Add(di.Def{
-		Name: bus.QueryHandlerName(testQueryHandler{}),
-		Build: func(ctn di.Container) (interface{}, error) {
-			return testQueryHandler{}, nil
-		},
-	})
-
-	return builder
+	}
 }
 
 func TestBusHandlesEvent(t *testing.T) {
@@ -152,20 +153,21 @@ func TestBusHandlesEvent(t *testing.T) {
 		return
 	}
 
-	build := setupContainer()
-	build.Add(di.Def{
+	module := setupContainer()
+	module.Defs = append(module.Defs, bus.Def{
 		Name: "event-sync-handler",
 		Build: func(ctn di.Container) (interface{}, error) {
 			return sync, nil
 		},
 	})
-	build.Add(di.Def{
+	module.Defs = append(module.Defs, bus.Def{
 		Name: "event-async-handler",
 		Build: func(ctn di.Container) (interface{}, error) {
 			return async, nil
 		},
 	})
-	b := bus.NewBus(testConfig{}, build, []bus.BoundedContext{})
+	b := bus.NewBus(testConfig{}, []bus.Module{module})
+	defer b.Close()
 	b.ExtendEvents(bus.EventRules{
 		&testEvent{}: []string{"event-sync-handler", "event-async-handler"},
 	})
@@ -181,8 +183,9 @@ func TestBusHandlesEvent(t *testing.T) {
 }
 
 func TestBusHandlesCommands(t *testing.T) {
-	build := setupContainer()
-	b := bus.NewBus(testConfig{}, build, []bus.BoundedContext{})
+	module := setupContainer()
+	b := bus.NewBus(testConfig{}, []bus.Module{module})
+	defer b.Close()
 	b.Use(bus.CommandValidationGuard)
 	b.ExtendCommands(func(b bus.CmdBuilder) {
 		b.Command(stringReturnCmd{}).Handled(testCmdHandler{})
@@ -207,11 +210,9 @@ func (h queueHandler) Execute(ctx context.Context, c bus.Command) (bus.CommandRe
 }
 
 func TestBusQueueCommand(t *testing.T) {
-	sql.ResetSQLDB(testConfig{}.DBDsn())
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	result := ""
-	build := setupContainer()
+	module := setupContainer()
 
 	h := queueHandler{}
 	h.execute = func(ctx context.Context, c bus.Command) (res bus.CommandResponse, msgs []message.Message) {
@@ -221,16 +222,19 @@ func TestBusQueueCommand(t *testing.T) {
 		return
 	}
 
-	build.Add(di.Def{
-		Name: bus.CommandHandlerName(h),
+	module.Defs = append(module.Defs, bus.Def{
+		Name: h,
 		Build: func(ctn di.Container) (interface{}, error) {
 			return h, nil
 		},
 	})
-	b := bus.NewBus(testConfig{}, build, []bus.BoundedContext{})
+	b := bus.NewBus(testConfig{}, []bus.Module{module})
+	defer b.Close()
 	b.ExtendCommands(func(b bus.CmdBuilder) {
 		b.Command(stringReturnCmd{}).Handled(h)
 	})
+
+	sql.ResetSQLDB(testConfig{}.DBDsn())
 
 	res, err := b.Dispatch(context.Background(), stringReturnCmd{Return: "hello"}, false)
 	assert.NoError(t, err)
@@ -243,8 +247,9 @@ func TestBusQueueCommand(t *testing.T) {
 }
 
 func TestBusHandlesQueries(t *testing.T) {
-	build := setupContainer()
-	b := bus.NewBus(testConfig{}, build, []bus.BoundedContext{})
+	module := setupContainer()
+	b := bus.NewBus(testConfig{}, []bus.Module{module})
+	defer b.Close()
 	b.Use(bus.QueryValidationGuard)
 	b.ExtendQueries(func(b bus.QueryBuilder) {
 		b.Query(returnQuery{}).Handled(testQueryHandler{})

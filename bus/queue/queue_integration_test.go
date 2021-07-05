@@ -57,7 +57,7 @@ func (s *QueueIntegrationTest) SetupTest() {
 }
 
 func (s *QueueIntegrationTest) TearDownTest() {
-	s.queue.Close()
+	sql.ResetSQLDB(TestConfig{}.DBDsn())
 }
 
 func (s QueueIntegrationTest) TestPublishesAndSubscribes() {
@@ -69,8 +69,14 @@ func (s QueueIntegrationTest) TestPublishesAndSubscribes() {
 	idResult := uuid.Nil
 	topCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	ctx := log.WithID(context.Background())
+	err := s.queue.Publish(ctx, cmd)
+	s.NoError(err)
+
 	go func() {
 		s.queue.Subscribe(topCtx, func(ctx context.Context, msg message.Message) error {
+			defer cancel()
 			c := msg.(testCmd)
 			id := log.GetID(ctx)
 			idReturn <- id
@@ -78,10 +84,6 @@ func (s QueueIntegrationTest) TestPublishesAndSubscribes() {
 			return nil
 		})
 	}()
-
-	ctx := log.WithID(context.Background())
-	err := s.queue.Publish(ctx, cmd)
-	s.NoError(err)
 
 	received := 0
 	for {
@@ -92,7 +94,7 @@ func (s QueueIntegrationTest) TestPublishesAndSubscribes() {
 		case r := <-idReturn:
 			idResult = r
 			received++
-		case <-time.After(time.Millisecond * 2700):
+		case <-time.After(time.Millisecond * 3500):
 			cancel()
 			s.T().Error("Timed out")
 			return

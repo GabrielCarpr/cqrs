@@ -2,6 +2,9 @@ package bus
 
 import (
 	"context"
+	"fmt"
+	"reflect"
+
 	"github.com/GabrielCarpr/cqrs/bus/message"
 	"github.com/sarulabs/di/v2"
 )
@@ -58,4 +61,83 @@ func (b *Bus) commandContainerMiddleware(next CommandHandler) CommandHandler {
 
 		return next.Execute(ctx, c)
 	})
+}
+
+type Def struct {
+	Build    func(ctn di.Container) (interface{}, error)
+	Close    func(obj interface{}) error
+	Name     interface{}
+	Scope    string
+	Tags     []di.Tag
+	Unshared bool
+}
+
+func (d Def) name() string {
+	switch v := d.Name.(type) {
+	case string:
+		return v
+	case CommandHandler:
+		return CommandHandlerName(v)
+	case QueryHandler:
+		return QueryHandlerName(v)
+	default:
+		t := reflect.TypeOf(v)
+		return fmt.Sprint(t.PkgPath(), ".", t.Name())
+	}
+}
+
+func (d Def) diDef() di.Def {
+	return di.Def{
+		Build:    d.Build,
+		Close:    d.Close,
+		Name:     d.name(),
+		Scope:    d.Scope,
+		Tags:     d.Tags,
+		Unshared: d.Unshared,
+	}
+}
+
+// BoundedContext represents the integration between the main app and a BC.
+type Module interface {
+	EventRules() EventRules
+	Commands(CmdBuilder)
+	Queries(QueryBuilder)
+
+	// TODO: Make own internal DI system
+	Services() []Def
+}
+
+type FuncModule struct {
+	EventsFunc   func() EventRules
+	CommandsFunc func(CmdBuilder)
+	QueriesFunc  func(QueryBuilder)
+	ServicesFunc func() []Def
+
+	Defs []Def
+}
+
+func (m FuncModule) Commands(b CmdBuilder) {
+	if m.CommandsFunc != nil {
+		m.CommandsFunc(b)
+	}
+}
+
+func (m FuncModule) Queries(b QueryBuilder) {
+	if m.QueriesFunc != nil {
+		m.QueriesFunc(b)
+	}
+}
+
+func (m FuncModule) Services() []Def {
+	if m.ServicesFunc != nil {
+		return append(m.ServicesFunc(), m.Defs...)
+	}
+	return m.Defs
+}
+
+func (m FuncModule) EventRules() EventRules {
+	if m.EventsFunc != nil {
+		return m.EventsFunc()
+	}
+	return EventRules{}
 }
