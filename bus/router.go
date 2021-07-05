@@ -40,9 +40,6 @@ func NewMessageRouter() MessageRouter {
 }
 
 // MessageRouter routes a message to its correct destination.
-// TODO: Somehow support command specific middleware - what use case?
-// TODO: Change to composition based routing, rather than table based,
-// which will allow grouping and middlewares
 // TODO: Auto generate documentation of bus
 type MessageRouter struct {
 	Events        eventRules

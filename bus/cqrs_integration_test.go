@@ -15,10 +15,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type testConfig struct{}
-
-func (testConfig) DBDsn() string {
-	return "user=cqrs password=cqrs dbname=cqrs host=db sslmode=disable"
+var testConfig = sql.Config{
+	DBName: "cqrs",
+	DBHost: "db",
+	DBUser: "cqrs",
+	DBPass: "cqrs",
 }
 
 type testEvent struct {
@@ -131,7 +132,7 @@ func setupContainer() bus.FuncModule {
 }
 
 func TestBusHandlesEvent(t *testing.T) {
-	sql.ResetSQLDB(testConfig{}.DBDsn())
+	sql.ResetSQLDB(testConfig.DBDsn())
 	syncResult := ""
 	asyncResult := ""
 
@@ -166,7 +167,8 @@ func TestBusHandlesEvent(t *testing.T) {
 			return async, nil
 		},
 	})
-	b := bus.NewBus(testConfig{}, []bus.Module{module})
+	q := sql.NewSQLQueue(testConfig)
+	b := bus.NewBus([]bus.Module{module}, bus.UseQueue(q))
 	defer b.Close()
 	b.ExtendEvents(bus.EventRules{
 		&testEvent{}: []string{"event-sync-handler", "event-async-handler"},
@@ -184,7 +186,7 @@ func TestBusHandlesEvent(t *testing.T) {
 
 func TestBusHandlesCommands(t *testing.T) {
 	module := setupContainer()
-	b := bus.NewBus(testConfig{}, []bus.Module{module})
+	b := bus.NewBus([]bus.Module{module})
 	defer b.Close()
 	b.Use(bus.CommandValidationGuard)
 	b.ExtendCommands(func(b bus.CmdBuilder) {
@@ -228,13 +230,14 @@ func TestBusQueueCommand(t *testing.T) {
 			return h, nil
 		},
 	})
-	b := bus.NewBus(testConfig{}, []bus.Module{module})
+	q := sql.NewSQLQueue(testConfig)
+	b := bus.NewBus([]bus.Module{module}, bus.UseQueue(q))
 	defer b.Close()
 	b.ExtendCommands(func(b bus.CmdBuilder) {
 		b.Command(stringReturnCmd{}).Handled(h)
 	})
 
-	sql.ResetSQLDB(testConfig{}.DBDsn())
+	sql.ResetSQLDB(testConfig.DBDsn())
 
 	res, err := b.Dispatch(context.Background(), stringReturnCmd{Return: "hello"}, false)
 	assert.NoError(t, err)
@@ -248,7 +251,7 @@ func TestBusQueueCommand(t *testing.T) {
 
 func TestBusHandlesQueries(t *testing.T) {
 	module := setupContainer()
-	b := bus.NewBus(testConfig{}, []bus.Module{module})
+	b := bus.NewBus([]bus.Module{module})
 	defer b.Close()
 	b.Use(bus.QueryValidationGuard)
 	b.ExtendQueries(func(b bus.QueryBuilder) {

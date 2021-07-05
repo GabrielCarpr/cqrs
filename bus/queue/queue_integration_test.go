@@ -31,15 +31,15 @@ func (testCmd) Valid() error {
 	return nil
 }
 
-type TestConfig struct {
-}
-
-func (TestConfig) DBDsn() string {
-	return "user=cqrs password=cqrs dbname=cqrs host=db sslmode=disable"
+var TestConfig = sql.Config{
+	DBName: "cqrs",
+	DBHost: "db",
+	DBUser: "cqrs",
+	DBPass: "cqrs",
 }
 
 func TestSQLQueueIntegrationTest(t *testing.T) {
-	suite.Run(t, &QueueIntegrationTest{queue: sql.NewSQLQueue(TestConfig{})})
+	suite.Run(t, &QueueIntegrationTest{queue: sql.NewSQLQueue(TestConfig)})
 }
 
 type QueueIntegrationTest struct {
@@ -49,7 +49,7 @@ type QueueIntegrationTest struct {
 }
 
 func (s *QueueIntegrationTest) SetupTest() {
-	sql.ResetSQLDB(TestConfig{}.DBDsn())
+	sql.ResetSQLDB(TestConfig.DBDsn())
 	s.queue.RegisterCtxKey(log.CtxIDKey, func(b []byte) interface{} {
 		return uuid.MustParse(string(b))
 	})
@@ -57,7 +57,7 @@ func (s *QueueIntegrationTest) SetupTest() {
 }
 
 func (s *QueueIntegrationTest) TearDownTest() {
-	sql.ResetSQLDB(TestConfig{}.DBDsn())
+	sql.ResetSQLDB(TestConfig.DBDsn())
 }
 
 func (s QueueIntegrationTest) TestPublishesAndSubscribes() {

@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+// TODO: Build event patterns
+// TODO: Refactor to generics
 /*
 Command Context
 */

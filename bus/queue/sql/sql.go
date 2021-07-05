@@ -12,7 +12,6 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/GabrielCarpr/cqrs/bus/config"
 	ctxSx "github.com/GabrielCarpr/cqrs/bus/context"
 	"github.com/GabrielCarpr/cqrs/bus/message"
 
@@ -22,7 +21,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 )
 
-func makeDB(c config.Config) *stdSQL.DB {
+func makeDB(c Config) *stdSQL.DB {
 	db, err := stdSQL.Open("postgres", c.DBDsn())
 	if err != nil {
 		panic(err)
@@ -36,7 +35,7 @@ func makeDB(c config.Config) *stdSQL.DB {
 	return db
 }
 
-func NewSQLQueue(c config.Config) *SQLQueue {
+func NewSQLQueue(c Config) *SQLQueue {
 	db := makeDB(c)
 	logger := watermill.NewStdLogger(false, false)
 	publisher, err := sql.NewPublisher(
@@ -50,11 +49,10 @@ func NewSQLQueue(c config.Config) *SQLQueue {
 	if err != nil {
 		panic(err)
 	}
-	return &SQLQueue{c, db, logger, publisher, ctxSx.NewContextSerializer()}
+	return &SQLQueue{db, logger, publisher, ctxSx.NewContextSerializer()}
 }
 
 type SQLQueue struct {
-	config        config.Config
 	db            *stdSQL.DB
 	logger        watermill.LoggerAdapter
 	publisher     wmMessage.Publisher

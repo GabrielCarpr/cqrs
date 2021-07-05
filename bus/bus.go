@@ -4,12 +4,11 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
-	"github.com/GabrielCarpr/cqrs/bus/config"
-	"github.com/GabrielCarpr/cqrs/bus/message"
-	"github.com/GabrielCarpr/cqrs/bus/queue/sql"
-	"github.com/GabrielCarpr/cqrs/log"
 	stdlog "log"
 	"reflect"
+
+	"github.com/GabrielCarpr/cqrs/bus/message"
+	"github.com/GabrielCarpr/cqrs/log"
 
 	"github.com/sarulabs/di/v2"
 )
@@ -17,14 +16,13 @@ import (
 var Instance *Bus
 
 // NewBus returns a new configured bus.
-// TODO: Refactor to only accept bounded contexts, and the main app infrastructure
 // should fit into a bounded context. Maybe rename to modules.
-// TODO: Allow option changing using option functions
+// TODO: Allow option configuration using option functions, and of config struct
 // TODO: Find a better way of passing (or totally discard) config values
 // TODO: Find a better way of configuring the queue
 // TODO: Create own DI container, maybe with code gen, that allows request
 // scoping and control of dependence
-func NewBus(conf interface{}, bcs []Module) *Bus {
+func NewBus(bcs []Module, configs ...Config) *Bus {
 	if Instance != nil {
 		return Instance
 	}
@@ -40,11 +38,18 @@ func NewBus(conf interface{}, bcs []Module) *Bus {
 	b := &Bus{
 		routes:    NewMessageRouter(),
 		Container: c,
-		config:    conf.(config.Config),
-		queue:     sql.NewSQLQueue(conf.(config.Config)),
+		queue:     nil,
 		workers:   make([]func(), 0),
 		deletions: make([]func(), 0),
 	}
+
+	for _, conf := range configs {
+		err := conf(b)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	for _, bc := range bcs {
 		b.ExtendEvents(bc.EventRules())
 		b.routes.ExtendCommands(bc.Commands)
@@ -69,7 +74,6 @@ func NewBus(conf interface{}, bcs []Module) *Bus {
 type Bus struct {
 	routes    MessageRouter
 	Container di.Container
-	config    config.Config
 	queue     Queue
 
 	workers   []func()
@@ -88,7 +92,9 @@ func (b *Bus) Close() {
 	for _, del := range b.deletions {
 		del()
 	}
-	b.queue.Close()
+	if b.queue != nil {
+		b.queue.Close()
+	}
 	b.Container.Delete()
 	Instance = nil
 }
