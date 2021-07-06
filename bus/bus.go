@@ -5,6 +5,8 @@ import (
 	"encoding/gob"
 	"fmt"
 	stdlog "log"
+	"os"
+	"os/signal"
 	"reflect"
 
 	"github.com/GabrielCarpr/cqrs/bus/message"
@@ -16,13 +18,9 @@ import (
 var Instance *Bus
 
 // NewBus returns a new configured bus.
-// should fit into a bounded context. Maybe rename to modules.
-// TODO: Allow option configuration using option functions, and of config struct
-// TODO: Find a better way of passing (or totally discard) config values
-// TODO: Find a better way of configuring the queue
 // TODO: Create own DI container, maybe with code gen, that allows request
 // scoping and control of dependence
-func NewBus(bcs []Module, configs ...Config) *Bus {
+func NewBus(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 	if Instance != nil {
 		return Instance
 	}
@@ -35,10 +33,14 @@ func NewBus(bcs []Module, configs ...Config) *Bus {
 	}
 	c := builder.Build()
 	gob.Register(queuedEvent{})
+
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, os.Kill)
 	b := &Bus{
 		routes:    NewMessageRouter(),
 		Container: c,
 		queue:     nil,
+		ctx:       ctx,
+		ctxCancel: cancel,
 		workers:   make([]func(), 0),
 		deletions: make([]func(), 0),
 	}
@@ -75,6 +77,8 @@ type Bus struct {
 	routes    MessageRouter
 	Container di.Container
 	queue     Queue
+	ctx       context.Context
+	ctxCancel context.CancelFunc
 
 	workers   []func()
 	deletions []func()
@@ -89,6 +93,8 @@ type Bus struct {
 // TODO: Should be private, and cleanup handled by ctx cancellation.
 // But, what about in publish mode?
 func (b *Bus) Close() {
+	log.Info(b.ctx, "Closing bus", log.F{})
+	defer b.ctxCancel()
 	for _, del := range b.deletions {
 		del()
 	}
@@ -103,13 +109,17 @@ func (b *Bus) Close() {
 // node, or in the background on an API server
 // TODO: Handle clean up from here, and don't block. Use ctx for
 // cancellation
-func (b *Bus) Work(busCtx context.Context) {
+func (b *Bus) Work() {
 	for _, work := range b.workers {
 		work()
 	}
-	b.queue.Subscribe(busCtx, func(ctx context.Context, msg message.Message) error {
+
+	// The queue blocks. The ctx will signal cancellation, and then it will unblock
+	b.queue.Subscribe(b.ctx, func(ctx context.Context, msg message.Message) error {
 		return b.routeFromQueue(ctx, msg)
 	})
+
+	b.Close()
 }
 
 func (b *Bus) Get(key string) interface{} {

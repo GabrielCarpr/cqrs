@@ -16,7 +16,6 @@ import (
 )
 
 // queueAction is a callback from Messenger that allows JobController to queue tasks.
-// TODO: Find some way of interfacing with cqrs cmd type
 type queueAction func(context.Context, bus.Command) error
 
 // NewController returns a new controller.
