@@ -2,12 +2,20 @@ package auth
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"github.com/GabrielCarpr/cqrs/errors"
 	"golang.org/x/crypto/bcrypt"
 	"strings"
 
 	"github.com/google/uuid"
+)
+
+var (
+	// AuthCtxKey is the key used for storing credentials in the context
+	AuthCtxKey = authCtxKeyType("authCtx")
+
+	// Forbidden is an error returned when access is denied
+	Forbidden = errors.Error{Code: 403, Message: "Forbidden"}
 )
 
 type authCtxKeyType string
@@ -15,9 +23,6 @@ type authCtxKeyType string
 func (k authCtxKeyType) String() string {
 	return string(k)
 }
-
-// AuthCtxKey is the key used for storing credentials in the context
-var AuthCtxKey = authCtxKeyType("authCtx")
 
 // Credentials is an access control record
 type Credentials struct {
@@ -81,12 +86,11 @@ func Enforce(ctx context.Context, requiredScopes ...[]string) error {
 
 	creds := GetCredentials(ctx)
 	if !creds.Valid() {
-		// TODO: Create basic error package for bus errors
-		return errors.New("Forbidden")
+		return Forbidden
 	}
 	userScopes := creds.Scopes
 	if len(userScopes) == 0 {
-		return errors.New("Forbidden")
+		return Forbidden
 	}
 
 	accessGranted := false
@@ -119,7 +123,7 @@ func Enforce(ctx context.Context, requiredScopes ...[]string) error {
 	}
 
 	if accessGranted == false {
-		return errors.New("Forbidden")
+		return Forbidden
 	}
 
 	return nil

@@ -9,4 +9,6 @@ import (
 	_ "github.com/GabrielCarpr/cqrs/log"
 	// Auth package - access control and authorization adapters
 	_ "github.com/GabrielCarpr/cqrs/auth"
+	// Error package - error types for use library wide
+	_ "github.com/GabrielCarpr/cqrs/errors"
 )

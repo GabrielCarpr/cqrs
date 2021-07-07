@@ -2,41 +2,14 @@ package auth
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
-
-func TestAccessTokenClaimsScopes(t *testing.T) {
-	creds := Credentials{ID: uuid.New(), Scopes: []string{"hello", "there"}}
-	res := CreateAccessTokenClaims(creds)
-	if res.Scopes != "hello there" {
-		t.Errorf("Did not join scopes %s", res.Scopes)
-	}
-
-	creds = Credentials{ID: uuid.New(), Scopes: []string{"hello"}}
-	res = CreateAccessTokenClaims(creds)
-	if res.Scopes != "hello" {
-		t.Errorf("Scopes were malformed %s", res.Scopes)
-	}
-}
-
-func TestSignTokenClaims(t *testing.T) {
-	creds := Credentials{ID: uuid.New(), Scopes: []string{"hello", "world"}}
-	claims := CreateAccessTokenClaims(creds)
-
-	res, err := SignTokenClaims(claims, "secret")
-	if err != nil {
-		t.Errorf("Produced error %s", err)
-	}
-	if len(strings.Split(res, ".")) != 3 {
-		t.Errorf("Signed claims were not a valid JWT %s", res)
-	}
-}
 
 func TestHashPassword(t *testing.T) {
 	hash := HashPassword("top-secret")
@@ -63,35 +36,35 @@ func TestCheckPassword(t *testing.T) {
 func TestCheckAccessToken(t *testing.T) {
 	ID := uuid.New()
 	creds := Credentials{[]string{"hello", "world"}, ID}
-	claims := CreateAccessTokenClaims(creds)
-	res, _ := SignTokenClaims(claims, "secret")
+	token, err := CreateAccessToken(creds, "secret")
+	require.NoError(t, err)
 
-	authCtx, err := ReadAccessToken(res, "secret")
+	creds, err = ReadToken(token, "secret")
 	if err != nil {
 		t.Errorf("Produced error: %w", err)
 	}
 
-	if authCtx.ID != ID {
-		t.Errorf("Token ID (%s) not equal to input (%s)", authCtx.ID.String(), ID.String())
+	if creds.ID != ID {
+		t.Errorf("Token ID (%s) not equal to input (%s)", creds.ID.String(), ID.String())
 	}
 
-	if len(authCtx.Scopes) != 2 {
-		t.Errorf("Wrong number of scopes: %v", authCtx.Scopes)
+	if len(creds.Scopes) != 2 {
+		t.Errorf("Wrong number of scopes: %v", creds.Scopes)
 	}
-	if authCtx.Scopes[1] != "world" {
+	if creds.Scopes[1] != "world" {
 		t.Errorf("Scopes missing world")
 	}
 }
 
 func TestCheckExpiredToken(t *testing.T) {
-	claims := jwt.StandardClaims{
+	claims := claims{StandardClaims: jwt.StandardClaims{
 		Issuer:    "users",
 		Subject:   "hello",
 		ExpiresAt: time.Now().Add(-2 * time.Minute).Unix(),
-	}
-	res, _ := SignTokenClaims(claims, "secret")
+	}}
+	res, _ := signTokenClaims(claims, "secret")
 
-	authCtx, err := ReadAccessToken(res, "secret")
+	authCtx, err := ReadToken(res, "secret")
 
 	if err == nil {
 		t.Errorf("Error was not produced")
@@ -107,9 +80,9 @@ func TestCheckTokenIncorrectKey(t *testing.T) {
 		Subject:   "hello",
 		ExpiresAt: time.Now().Add(-2 * time.Minute).Unix(),
 	}
-	res, _ := SignTokenClaims(claims, "secret")
+	res, _ := signTokenClaims(claims, "secret")
 
-	authCtx, err := ReadAccessToken(res, "secrett")
+	authCtx, err := ReadToken(res, "secrett")
 
 	if err == nil {
 		t.Errorf("Error was not produced")
