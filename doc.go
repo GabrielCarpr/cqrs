@@ -7,4 +7,6 @@ import (
 	_ "github.com/GabrielCarpr/cqrs/background"
 	// Log package - a basic global logger
 	_ "github.com/GabrielCarpr/cqrs/log"
+	// Auth package - access control and authorization adapters
+	_ "github.com/GabrielCarpr/cqrs/auth"
 )
