@@ -18,8 +18,6 @@ import (
 var Instance *Bus
 
 // NewBus returns a new configured bus.
-// TODO: Create own DI container, maybe with code gen, that allows request
-// scoping and control of dependence
 func NewBus(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 	if Instance != nil {
 		return Instance
@@ -57,9 +55,7 @@ func NewBus(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 		b.routes.ExtendCommands(bc.Commands)
 		b.routes.ExtendQueries(bc.Queries)
 	}
-	// TODO: Add access control middleware back
-	// and generalise access control,
-	// with adapters to use in different ports
+
 	b.Use(
 		b.queryContainerMiddleware,
 		b.commandContainerMiddleware,
@@ -90,8 +86,6 @@ type Bus struct {
 }
 
 // Close deletes all the container resources.
-// TODO: Should be private, and cleanup handled by ctx cancellation.
-// But, what about in publish mode?
 func (b *Bus) Close() {
 	log.Info(b.ctx, "Closing bus", log.F{})
 	defer b.ctxCancel()
@@ -107,8 +101,6 @@ func (b *Bus) Close() {
 
 // Work runs the bus in subscribe mode, to be ran as on a worker
 // node, or in the background on an API server
-// TODO: Handle clean up from here, and don't block. Use ctx for
-// cancellation
 func (b *Bus) Work() {
 	for _, work := range b.workers {
 		work()
@@ -128,7 +120,6 @@ func (b *Bus) Get(key string) interface{} {
 
 // RegisterDeletion allows a plugin to register a function to
 // clean itself up.
-// TODO: Replace cleanup with more idiomatic context cleanup.
 func (b *Bus) RegisterDeletion(fn func()) {
 	b.deletions = append(b.deletions, fn)
 }

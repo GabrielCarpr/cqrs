@@ -51,7 +51,6 @@ func NewEventQueue(owner interface{ String() string }) EventQueue {
 
 // EventQueue is embedded in entities to buffer events before
 // being released to infrastructure
-// TODO: Add entity versioning
 type EventQueue struct {
 	owner     interface{ String() string }
 	events    []Event

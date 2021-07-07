@@ -103,7 +103,6 @@ type Module interface {
 	Commands(CmdBuilder)
 	Queries(QueryBuilder)
 
-	// TODO: Make own internal DI system
 	Services() []Def
 }
 

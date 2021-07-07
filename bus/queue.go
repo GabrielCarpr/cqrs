@@ -16,10 +16,8 @@ type Queue interface {
 
 	// Subscribe registers a callback for inbound messages
 	// and runs the queue, blocking
-	// TODO: Assess whether this should block
 	Subscribe(context.Context, func(context.Context, message.Message) error)
 
 	// Close closes the queue down
-	// TODO: Assess necessity and find better way of managing queue lifecycle
 	Close()
 }

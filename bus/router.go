@@ -2,7 +2,6 @@ package bus
 
 // EventRules is a map that determines routing for an event.
 // The key is the event name, and the value is a list of DI handler names.
-// TODO: Change into routing composition
 type EventRules map[Event][]string
 
 type eventRules map[string][]string
@@ -40,7 +39,6 @@ func NewMessageRouter() MessageRouter {
 }
 
 // MessageRouter routes a message to its correct destination.
-// TODO: Auto generate documentation of bus
 type MessageRouter struct {
 	Events        eventRules
 	commands      CommandContext
