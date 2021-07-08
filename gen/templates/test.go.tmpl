@@ -1,0 +1,24 @@
+package {{ .ContextPkg }}_test
+
+import (
+    "testing"
+
+    "{{ .Context }}"
+    "github.com/stretchr/testify/suite"
+)
+
+type {{ .Name }}Test struct {
+    suite.Suite
+}
+
+func (s *{{ .Name }}Test) SetupTest() {
+
+}
+
+func Test{{ .Name }}(t *testing.T) {
+    suite.Run(t, new({{ .Name }}Test))
+}
+
+func (s {{ .Name }}) Test() {
+
+}

@@ -1,0 +1,45 @@
+package commands
+
+import (
+    "api/pkg/cqrs"
+    "api/pkg/cqrs/message"
+    "context"
+)
+
+/** COMMAND */
+
+type {{ .Name }} struct {
+    cqrs.CommandType
+
+}
+
+func (c {{ .Name }}) CmdName() string {
+    return "{{ .String }}"
+}
+
+func (c {{ .Name }}) Valid() error {
+    return nil
+}
+
+func (c {{ .Name }}) Auth(ctx context.Context) [][]string {
+    return [][]string{}
+}
+
+
+/** HANDLER */
+
+var _ = (*{{ .Name }}Handler)(nil)
+
+func New{{ .Name }}Handler() *{{ .Name }}Handler {
+    return &{{ .Name }}Handler{}
+}
+
+type {{ .Name }}Handler struct {
+
+}
+
+func (h *{{ .Name }}Handler) Execute(c cqrs.Command) (res cqrs.CommandResponse, msgs []message.Message) {
+    _= c.({{ .Name }})
+
+    return
+}

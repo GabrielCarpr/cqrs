@@ -16,3 +16,8 @@ tasks:
       - go build .
     sources:
       - ./**/*.go
+
+  render-example:
+    cmds:
+      - rm -rf ./_example
+      - cd gen; go run github.com/GabrielCarpr/cqrs/gen init -name=example -root=../_example

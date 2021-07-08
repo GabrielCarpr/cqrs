@@ -1,0 +1,41 @@
+package queries
+
+import (
+    "api/pkg/cqrs"
+    "context"
+    "{{ .ReturnImport }}"
+)
+
+/** QUERY */
+
+type {{ .Name }} struct {
+    cqrs.QueryType
+}
+
+func (q {{ .Name }}) Valid() error {
+    return nil
+}
+
+func (q {{ .Name }}) Auth(ctx context.Context) [][]string {
+    return [][]string{}
+}
+
+
+/** HANDLER */
+
+func New{{ .Name }}Handler() *{{ .Name }}Handler {
+    return &{{ .Name }}Handler{}
+}
+
+var _ = (*{{ .Name }}Handler)(nil)
+
+type {{ .Name }}Handler struct {
+
+}
+
+func (h {{ .Name }}Handler) Execute(ctx context.Context, q cqrs.Query, r interface{}) error {
+    _= q.({{ .Name }})
+    _= r.({{ .ReturnStruct }})
+
+    return nil
+}
