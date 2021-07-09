@@ -4,6 +4,7 @@ import (
 	"example/internal/app"
 	"flag"
 	"log"
+	"context"
 )
 
 var mode string
@@ -15,7 +16,7 @@ func init() {
 }
 
 func main() {
-	app := app.Make()
+	app := app.Make(context.Background())
     defer app.Delete()
 	log.Print("Application building complete")
 

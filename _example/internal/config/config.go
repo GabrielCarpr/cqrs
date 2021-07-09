@@ -14,7 +14,7 @@ func init() {
 // NewConfig returns a Config object
 func NewConfig() Config {
 	return Config{
-		AppName:     "api",
+		AppName:     "example",
 		Environment: requiredS("ENVIRONMENT"),
 		DBHost:      requiredS("DB_HOST"),
 		DBPort:      requiredS("DB_PORT"),

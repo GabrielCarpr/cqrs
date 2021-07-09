@@ -33,7 +33,7 @@ var modules = []bus.Module{
 
 // Make Builds and returns the app
 func Make(ctx context.Context) *App {
-	ctx, _ := signal.NotifyContext(ctx, os.Interrupt, os.Kill)
+	ctx, _ = signal.NotifyContext(ctx, os.Interrupt, os.Kill)
 
 	queue := sql.NewSQLQueue(sql.Config{
 		DBUser: config.Values.DBUser,

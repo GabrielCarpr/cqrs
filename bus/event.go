@@ -67,7 +67,17 @@ func (e *EventQueue) Publish(events ...Event) {
 }
 
 // Release empties the event queue, returning
-func (e *EventQueue) Release() []Event {
+func (e *EventQueue) Release() []message.Message {
+	output := make([]message.Message, len(e.events))
+	for i, event := range e.events {
+		output[i] = event
+	}
+	e.events = make([]Event, 0)
+	return output
+}
+
+// ReleaseEvents empties the event queue, returning events
+func (e *EventQueue) ReleaseEvents() []Event {
 	output := make([]Event, len(e.events))
 	for i, event := range e.events {
 		output[i] = event

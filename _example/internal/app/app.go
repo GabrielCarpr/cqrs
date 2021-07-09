@@ -3,7 +3,6 @@ package app
 import (
 	"example/internal/config"
 	"github.com/GabrielCarpr/cqrs/auth"
-	"github.com/GabrielCarpr/cqrs/background"
 	"github.com/GabrielCarpr/cqrs/errors"
 	"github.com/GabrielCarpr/cqrs/bus"
 	"github.com/GabrielCarpr/cqrs/log"
@@ -33,8 +32,8 @@ var modules = []bus.Module{
 }
 
 // Make Builds and returns the app
-func Make() *App {
-	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+func Make(ctx context.Context) *App {
+	ctx, _ = signal.NotifyContext(ctx, os.Interrupt, os.Kill)
 
 	queue := sql.NewSQLQueue(sql.Config{
 		DBUser: config.Values.DBUser,
@@ -58,21 +57,6 @@ func Make() *App {
 	})
 	b.RegisterContextKey(log.CtxIDKey, func(j []byte) interface{} {
 		return uuid.MustParse(string(j))
-	})
-
-	// Background setup
-	bgConf := background.BuildConfig("example")
-	bg := background.Build(bgConf)
-	bg.AttachRouter(func(ctx context.Context, c bus.Command) error {
-		_, err := b.Dispatch(ctx, c, false)
-		return err
-	})
-	b.Use(bg.Controller().JobFinishingMiddleware)
-	b.RegisterDeletion(func() {
-		bg.Delete()
-	})
-	b.RegisterWork(func() {
-		bg.Work(false)
 	})
 
 	app := App{Bus: b}

@@ -14,7 +14,7 @@ tasks:
   test:system:
     deps: [render-example]
     cmds:
-      - docker-compose run --rm go bash -c "cd _example; go run ."
+      - docker-compose run --rm go bash -c "cd _example; go build ."
 
   build:
     cmds:
