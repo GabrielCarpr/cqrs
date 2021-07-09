@@ -19,8 +19,9 @@ var (
 )
 
 type context struct {
-	Name string
-	Root string
+	Module  string
+	Root    string
+	Example bool
 }
 
 type tmplMap map[string]*template.Template
@@ -29,7 +30,7 @@ type fileMap map[string]*bytes.Buffer
 
 func (c context) Validate() error {
 	switch true {
-	case c.Name == "":
+	case c.Module == "":
 		return errors.New("Name must be provided")
 	}
 	return nil
@@ -37,8 +38,9 @@ func (c context) Validate() error {
 
 func Init(args ...string) {
 	c := context{}
-	makeCmd.StringVar(&c.Name, "name", "", "The name of the application to create")
+	makeCmd.StringVar(&c.Module, "module", "", "The name of the application to create")
 	makeCmd.StringVar(&c.Root, "root", ".", "The root directory to initialize into")
+	makeCmd.BoolVar(&c.Example, "example", false, "Generate for the example app")
 
 	err := makeCmd.Parse(args)
 	if err != nil {

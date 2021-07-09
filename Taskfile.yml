@@ -11,6 +11,11 @@ tasks:
     cmds:
       - docker-compose run --rm go go test ./... {{ .CLI_ARGS }}
 
+  test:system:
+    deps: [render-example]
+    cmds:
+      - docker-compose run --rm go bash -c "cd _example; go run ."
+
   build:
     cmds:
       - go build .
@@ -20,4 +25,5 @@ tasks:
   render-example:
     cmds:
       - rm -rf ./_example
-      - cd gen; go run github.com/GabrielCarpr/cqrs/gen init -name=example -root=../_example
+      - cd gen; go run . init -module=example -root=../_example -example=true
+      - cd _example; go mod tidy

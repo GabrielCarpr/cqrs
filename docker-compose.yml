@@ -20,6 +20,14 @@ services:
     working_dir: /src
     depends_on: 
       - db
+    environment:
+      ENVIRONMENT: "development"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      DB_USER: "cqrs"
+      DB_NAME: "cqrs"
+      DB_PASS: "cqrs"
+      SECRET_KEY: "secret"
 
 volumes:
   go-deps: {}

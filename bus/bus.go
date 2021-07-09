@@ -17,8 +17,20 @@ import (
 
 var Instance *Bus
 
-// NewBus returns a new configured bus.
-func NewBus(ctx context.Context, bcs []Module, configs ...Config) *Bus {
+// Default returns a bus with recommended middlewares
+func Default(ctx context.Context, mods []Module, configs ...Config) *Bus {
+	b := New(ctx, mods, configs...)
+	b.Use(
+		CommandValidationGuard,
+		QueryValidationGuard,
+		CommandLoggingMiddleware,
+		QueryLoggingMiddleware,
+	)
+	return b
+}
+
+// New returns a new configured bus.
+func New(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 	if Instance != nil {
 		return Instance
 	}
