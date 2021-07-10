@@ -26,7 +26,7 @@ import (
 	"gorm.io/gorm"
 )
 
-var modules = []bus.Module{
+var Modules = []bus.Module{
 	users.Users{},
 	Main,
 }
@@ -43,7 +43,7 @@ func Make(ctx context.Context) *App {
 	})
 
 	// Bus setup
-	b := bus.Default(ctx, modules, bus.UseQueue(queue))
+	b := bus.Default(ctx, Modules, bus.UseQueue(queue))
 	b.Use(
 		auth.CommandAuthGuard,
 		auth.QueryAuthGuard,
@@ -128,6 +128,7 @@ var Main = bus.FuncModule{
 					}
 					return err2
 				},
+				Unshared: true,
 			},
 		}
 	},

@@ -16,6 +16,7 @@ services:
     image: golang:1.16.5
     volumes:
       - ./:/src
+      - ./_example/migrations:/var/migrations
       - go-deps:/go/pkg
     working_dir: /src
     depends_on: 

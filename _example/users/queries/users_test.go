@@ -1,13 +1,12 @@
 package queries_test
 
 import (
-	"api/internal/support"
-	"api/internal/tester"
-	"api/pkg/auth"
-	"api/pkg/util"
-	"api/users/db"
-	"api/users/entities"
-	"api/users/queries"
+	"example/internal/support"
+	"example/internal/tester"
+	"github.com/GabrielCarpr/cqrs/auth"
+	"example/users/db"
+	"example/users/entities"
+	"example/users/queries"
 	"testing"
 
 	"github.com/google/uuid"
@@ -36,7 +35,7 @@ func (s *UsersTest) SetupTest() {
 
 	s.users.Persist(s.user)
 	s.users.Persist(basicUser)
-	s.handler = s.Get(util.TypeOf(queries.UsersHandler{})).(*queries.UsersHandler)
+	s.handler = s.Get(queries.UsersHandler{}).(*queries.UsersHandler)
 }
 
 func TestUsers(t *testing.T) {

@@ -14,7 +14,9 @@ tasks:
   test:system:
     deps: [render-example]
     cmds:
-      - docker-compose run --rm go bash -c "cd _example; go build ."
+      - docker-compose run --rm go bash -c "cd _example; go test ./..."
+    sources:
+      - ./_example/**/*
 
   build:
     cmds:
@@ -27,3 +29,6 @@ tasks:
       - rm -rf ./_example
       - cd gen; go run . init -module=example -root=../_example -example=true
       - cd _example; go mod tidy
+    sources:
+      - ./gen/templates/init/**/*.*
+      - ./gen/init/**/*.go

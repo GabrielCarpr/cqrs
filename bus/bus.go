@@ -126,8 +126,17 @@ func (b *Bus) Work() {
 	b.Close()
 }
 
-func (b *Bus) Get(key string) interface{} {
-	return b.Container.UnscopedGet(key)
+func (b *Bus) Get(key interface{}) interface{} {
+	switch key := key.(type) {
+	case string:
+		return b.Container.UnscopedGet(key)
+	case CommandHandler:
+		return b.Container.UnscopedGet(CommandHandlerName(key))
+	case QueryHandler:
+		return b.Container.UnscopedGet(QueryHandlerName(key))
+	default:
+		panic(fmt.Sprintf("Cannot use %s as a key", reflect.TypeOf(key)))
+	}
 }
 
 // RegisterDeletion allows a plugin to register a function to
