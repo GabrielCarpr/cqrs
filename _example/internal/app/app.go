@@ -107,8 +107,9 @@ var Main = bus.FuncModule{
 			{
 				Name: "migrator",
 				Build: func(ctn di.Container) (interface{}, error) {
+					migs := config.Values.Migrations
 					m, err := migrate.New(
-						"file:///var/migrations",
+						fmt.Sprintf("file://%s", migs),
 						fmt.Sprintf(
 							"postgresql://%s:%s@%s:%s/%s?sslmode=disable",
 							config.Values.DBUser,

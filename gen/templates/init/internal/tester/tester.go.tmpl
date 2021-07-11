@@ -60,16 +60,16 @@ func (i *Integration) migrate() {
 }
 
 func GetTestConfig() config.Config {
-	return config.Config{
-		Environment:     "development",
-		AppName:         "{{ .Module }}",
-		DBHost:          "db",
-		DBPort:          "5432",
-		DBName:          "cqrs",
-		DBUser:          "cqrs",
-		DBPass:          "cqrs",
-		Secret:          "secret",
-		CORSOrigin:      "*",
-		AppURL:          "localhost:8000",
-	}
+	c := config.NewConfig()
+	c.Environment = "development"
+	c.AppName =     "{{ .Module }}"
+	c.DBHost =      "db"
+	c.DBPort =      "5432"
+	c.DBName =      "cqrs"
+	c.DBUser =      "cqrs"
+	c.DBPass =      "cqrs"
+	c.Secret =      "secret"
+	c.CORSOrigin =  "*"
+	c.AppURL =      "localhost:8000"
+	return c
 }

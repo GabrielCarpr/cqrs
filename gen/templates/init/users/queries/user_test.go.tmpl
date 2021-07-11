@@ -60,7 +60,7 @@ func (s *UserTest) TestFindMissingEmail() {
 	err := s.Bus().Query(auth.TestCtx(support.NewID().UUID, "users:read"), q, &res)
 
 	s.Error(err)
-	s.ErrorIs(err, queries.UserNotFound)
+	s.ErrorIs(err, queries.ErrUserNotFound)
 }
 
 func (s *UserTest) TestFindMissingID() {
@@ -70,5 +70,5 @@ func (s *UserTest) TestFindMissingID() {
 	err := s.Bus().Query(auth.TestCtx(support.NewID().UUID, "users:read"), q, &res)
 
 	s.Error(err)
-	s.ErrorIs(err, queries.UserNotFound)
+	s.ErrorIs(err, queries.ErrUserNotFound)
 }

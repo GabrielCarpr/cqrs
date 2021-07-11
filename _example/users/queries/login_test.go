@@ -38,6 +38,6 @@ func (s LoginTest) TestLoginNotFound() {
 	var res readmodels.Authentication
 	err := s.Bus().Query(context.Background(), query, &res)
 	s.Error(err)
-	s.ErrorIs(err, queries.LoginFail)
+	s.ErrorIs(err, queries.ErrLoginFail)
 	s.Empty(res.AccessToken)
 }

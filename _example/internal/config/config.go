@@ -24,6 +24,7 @@ func NewConfig() Config {
 		Secret:      requiredS("SECRET_KEY"),
 		CORSOrigin:  defaultS("CORS_ORIGIN", ""),
 		AppURL:      defaultS("APP_URL", "http://localhost:8080"),
+		Migrations: defaultS("MIGRATIONS", "/var/migrations"),
 	}
 }
 
@@ -41,6 +42,8 @@ type Config struct {
 
 	Secret     string
 	CORSOrigin string
+
+	Migrations string
 
 	AppURL string
 }
