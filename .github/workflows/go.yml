@@ -44,6 +44,21 @@ jobs:
 
   system:
     runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: "development"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      DB_USER: "cqrs"
+      DB_NAME: "cqrs"
+      DB_PASS: "cqrs"
+      SECRET_KEY: "secret"
+    services:
+      db:
+        image: postgres:13.2
+        env:
+          POSTGRES_DB: cqrs
+          POSTGRES_USER: cqrs
+          POSTGRES_PASSWORD: cqrs
     steps:
     - uses: actions/checkout@v2
     - name: Setup Go
