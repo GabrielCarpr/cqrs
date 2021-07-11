@@ -52,6 +52,7 @@ jobs:
       DB_NAME: "cqrs"
       DB_PASS: "cqrs"
       SECRET_KEY: "secret"
+      MIGRATIONS: "/src/migrations"
     services:
       db:
         image: postgres:13.2
@@ -67,6 +68,7 @@ jobs:
         go-version: 1.16.5
 
     - name: Render
+      working-directory: /src
       run: |
         rm -rf ./_example
         cd gen; go run . init -module=example -root=../_example -example=true
