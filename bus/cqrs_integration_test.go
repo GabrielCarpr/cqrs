@@ -168,7 +168,7 @@ func TestBusHandlesEvent(t *testing.T) {
 		},
 	})
 	q := sql.NewSQLQueue(testConfig)
-	b := bus.NewBus(ctx, []bus.Module{module}, bus.UseQueue(q))
+	b := bus.New(ctx, []bus.Module{module}, bus.UseQueue(q))
 	b.ExtendEvents(bus.EventRules{
 		&testEvent{}: []string{"event-sync-handler", "event-async-handler"},
 	})
@@ -185,7 +185,7 @@ func TestBusHandlesEvent(t *testing.T) {
 
 func TestBusHandlesCommands(t *testing.T) {
 	module := setupContainer()
-	b := bus.NewBus(context.Background(), []bus.Module{module})
+	b := bus.New(context.Background(), []bus.Module{module})
 	defer b.Close()
 	b.Use(bus.CommandValidationGuard)
 	b.ExtendCommands(func(b bus.CmdBuilder) {
@@ -230,7 +230,7 @@ func TestBusQueueCommand(t *testing.T) {
 		},
 	})
 	q := sql.NewSQLQueue(testConfig)
-	b := bus.NewBus(ctx, []bus.Module{module}, bus.UseQueue(q))
+	b := bus.New(ctx, []bus.Module{module}, bus.UseQueue(q))
 	b.ExtendCommands(func(b bus.CmdBuilder) {
 		b.Command(stringReturnCmd{}).Handled(h)
 	})
@@ -249,7 +249,7 @@ func TestBusQueueCommand(t *testing.T) {
 
 func TestBusHandlesQueries(t *testing.T) {
 	module := setupContainer()
-	b := bus.NewBus(context.Background(), []bus.Module{module})
+	b := bus.New(context.Background(), []bus.Module{module})
 	defer b.Close()
 	b.Use(bus.QueryValidationGuard)
 	b.ExtendQueries(func(b bus.QueryBuilder) {

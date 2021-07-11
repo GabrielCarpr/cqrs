@@ -17,8 +17,20 @@ import (
 
 var Instance *Bus
 
-// NewBus returns a new configured bus.
-func NewBus(ctx context.Context, bcs []Module, configs ...Config) *Bus {
+// Default returns a bus with recommended middlewares
+func Default(ctx context.Context, mods []Module, configs ...Config) *Bus {
+	b := New(ctx, mods, configs...)
+	b.Use(
+		CommandValidationGuard,
+		QueryValidationGuard,
+		CommandLoggingMiddleware,
+		QueryLoggingMiddleware,
+	)
+	return b
+}
+
+// New returns a new configured bus.
+func New(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 	if Instance != nil {
 		return Instance
 	}
@@ -114,8 +126,17 @@ func (b *Bus) Work() {
 	b.Close()
 }
 
-func (b *Bus) Get(key string) interface{} {
-	return b.Container.UnscopedGet(key)
+func (b *Bus) Get(key interface{}) interface{} {
+	switch key := key.(type) {
+	case string:
+		return b.Container.UnscopedGet(key)
+	case CommandHandler:
+		return b.Container.UnscopedGet(CommandHandlerName(key))
+	case QueryHandler:
+		return b.Container.UnscopedGet(QueryHandlerName(key))
+	default:
+		panic(fmt.Sprintf("Cannot use %s as a key", reflect.TypeOf(key)))
+	}
 }
 
 // RegisterDeletion allows a plugin to register a function to

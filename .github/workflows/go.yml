@@ -41,3 +41,34 @@ jobs:
 
       - name: Integration test
         run: go test -v ./...
+
+  system:
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: "development"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      DB_USER: "cqrs"
+      DB_NAME: "cqrs"
+      DB_PASS: "cqrs"
+      SECRET_KEY: "secret"
+      MIGRATIONS: "/home/runner/work/cqrs/cqrs/_example/migrations"
+    services:
+      db:
+        image: postgres:13.2
+        env:
+          POSTGRES_DB: cqrs
+          POSTGRES_USER: cqrs
+          POSTGRES_PASSWORD: cqrs
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16.5
+
+    - name: Render
+      run: |
+        rm -rf ./_example
+        cd gen; go run . init -module=example -root=../_example -example=true
+#        cd ../_example; go mod tidy && go test ./...

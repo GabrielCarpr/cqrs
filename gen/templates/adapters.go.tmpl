@@ -1,0 +1,27 @@
+package graphql
+
+import (
+    "context"
+    {{- range $package, $alias := .Imports }}
+    {{ $alias }} "{{ $package }}"
+    {{- end }}
+)
+
+
+{{- range .Commands }}
+func (r Resolver) {{ .Struct }}(ctx context.Context, args struct{ Input {{ .Alias }}.{{ .Struct }} }) (commandResponse, error) {
+    return commandResponseAdapter(r.bus.Dispatch(ctx, args.Input, {{ .Sync }}))
+}
+{{- end }}
+
+{{- range .Queries }}
+func (r Resolver) {{ .Struct "query" }}(ctx context.Context, args struct{ Query {{ .Alias "query" }}.{{ .Struct "query" }} }) ({{ if .Return }}{{ .Return }}{{ else }}{{ .CodeName "output" }}{{ end }}, error) {
+    var result {{ .CodeName "output" }}
+    err := r.bus.Query(ctx, args.Query, &result)
+    {{ if .Adapter }}
+    return {{ .Adapter }}(result, err)
+    {{ else }}
+    return result, err
+    {{ end }}
+}
+{{- end }}
