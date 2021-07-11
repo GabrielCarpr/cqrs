@@ -1,14 +1,13 @@
 package queries_test
 
 import (
-	"api/internal/errs"
-	"api/internal/support"
-	"api/internal/tester"
-	"api/pkg/auth"
-	"api/pkg/util"
-	"api/users/db"
-	"api/users/entities"
-	"api/users/queries"
+	"example/internal/support"
+	"example/internal/tester"
+	"github.com/GabrielCarpr/cqrs/auth"
+	"example/pkg/util"
+	"example/users/db"
+	"example/users/entities"
+	"example/users/queries"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -61,7 +60,7 @@ func (s *UserTest) TestFindMissingEmail() {
 	err := s.Bus().Query(auth.TestCtx(support.NewID().UUID, "users:read"), q, &res)
 
 	s.Error(err)
-	s.ErrorIs(err, errs.UserNotFound)
+	s.ErrorIs(err, queries.UserNotFound)
 }
 
 func (s *UserTest) TestFindMissingID() {
@@ -71,5 +70,5 @@ func (s *UserTest) TestFindMissingID() {
 	err := s.Bus().Query(auth.TestCtx(support.NewID().UUID, "users:read"), q, &res)
 
 	s.Error(err)
-	s.ErrorIs(err, errs.UserNotFound)
+	s.ErrorIs(err, queries.UserNotFound)
 }

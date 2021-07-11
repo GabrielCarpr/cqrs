@@ -1,8 +1,8 @@
 package entities_test
 
 import (
-	"api/pkg/errors"
-	"api/users/entities"
+	"{{ .Module }}/users/entities"
+	"github.com/GabrielCarpr/cqrs/errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,7 +28,7 @@ func TestRegisterAndPassword(t *testing.T) {
 
 func TestRegisterBadPassword(t *testing.T) {
 	_, err := entities.Register("gc@gmail.com", "123")
-	herr := err.(errors.HTTPErr)
+	herr := err.(errors.Error)
 	assert.Equal(t, 400, herr.Code)
 }
 
@@ -50,7 +50,7 @@ func TestChangePassword(t *testing.T) {
 
 func TestRegisterInvalidEmail(t *testing.T) {
 	_, err := entities.Register("gc.com", "password123")
-	httpErr := err.(errors.HTTPErr)
+	httpErr := err.(errors.Error)
 	assert.Equal(t, 400, httpErr.Code)
 	assert.Contains(t, httpErr.Message, "Email")
 }

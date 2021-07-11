@@ -1,12 +1,12 @@
 package queries_test
 
 import (
-	"api/internal/tester"
-	"api/pkg/auth"
-	"api/pkg/errors"
-	"api/users/db"
-	"api/users/entities"
-	"api/users/queries"
+	"example/internal/tester"
+	"github.com/GabrielCarpr/cqrs/auth"
+	"github.com/GabrielCarpr/cqrs/errors"
+	"example/users/db"
+	"example/users/entities"
+	"example/users/queries"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -47,5 +47,5 @@ func (s TestRoleSuite) TestGetMissingRole() {
 	s.Error(err)
 	role := r
 	s.Empty(role.ID.String())
-	s.ErrorIs(errors.HTTPErr{}, err)
+	s.ErrorIs(errors.Error{}, err)
 }

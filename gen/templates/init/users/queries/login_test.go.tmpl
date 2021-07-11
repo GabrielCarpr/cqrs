@@ -1,10 +1,9 @@
 package queries_test
 
 import (
-	"api/internal/errs"
-	"api/internal/tester"
-	"api/users/queries"
-	"api/users/readmodels"
+	"{{ .Module }}/internal/tester"
+	"{{ .Module }}/users/queries"
+	"{{ .Module }}/users/readmodels"
 	"context"
 	"testing"
 
@@ -39,6 +38,6 @@ func (s LoginTest) TestLoginNotFound() {
 	var res readmodels.Authentication
 	err := s.Bus().Query(context.Background(), query, &res)
 	s.Error(err)
-	s.ErrorIs(err, errs.LoginFail)
+	s.ErrorIs(err, queries.LoginFail)
 	s.Empty(res.AccessToken)
 }

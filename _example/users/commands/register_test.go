@@ -1,9 +1,9 @@
 package commands_test
 
 import (
-	"api/internal/support"
-	"api/users/commands"
-	"api/users/db"
+	"example/internal/support"
+	"example/users/commands"
+	"example/users/db"
 	"context"
 	"testing"
 

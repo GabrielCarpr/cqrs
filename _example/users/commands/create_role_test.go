@@ -1,9 +1,9 @@
 package commands_test
 
 import (
-	"api/pkg/auth"
-	"api/users/commands"
-	"api/users/db"
+	"github.com/GabrielCarpr/cqrs/auth"
+	"example/users/commands"
+	"example/users/db"
 	"testing"
 
 	"github.com/google/uuid"

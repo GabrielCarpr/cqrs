@@ -1,12 +1,12 @@
 package commands_test
 
 import (
-	"api/pkg/auth"
-	"api/pkg/errors"
-	"api/pkg/util"
-	"api/users/commands"
-	"api/users/db"
-	"api/users/entities"
+	"github.com/GabrielCarpr/cqrs/auth"
+	"github.com/GabrielCarpr/cqrs/errors"
+	"example/pkg/util"
+	"example/users/commands"
+	"example/users/db"
+	"example/users/entities"
 	"github.com/google/uuid"
 	"testing"
 
@@ -48,7 +48,7 @@ func TestUpdateShortPassword(t *testing.T) {
 	res, _ := handler.Execute(auth.TestCtx(u.ID.UUID, "self:write"), cmd)
 
 	assert.Error(t, res.Error)
-	assert.ErrorIs(t, errors.HTTPErr{}, res.Error)
+	assert.ErrorIs(t, errors.Error{}, res.Error)
 	assert.Contains(t, res.Error.Error(), "Password")
 }
 
@@ -74,7 +74,7 @@ func TestCannotUpdateRoles(t *testing.T) {
 	res, _ := handler.Execute(auth.TestCtx(u.ID.UUID, "self:write"), cmd)
 
 	assert.Error(t, res.Error)
-	assert.ErrorIs(t, res.Error, errors.Forbidden)
+	assert.ErrorIs(t, res.Error, auth.Forbidden)
 	us, _ := users.Find(u.ID)
 	u = us[0]
 	assert.Len(t, u.RoleIDs, 1)

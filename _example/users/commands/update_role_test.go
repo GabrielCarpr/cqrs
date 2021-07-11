@@ -1,12 +1,12 @@
 package commands_test
 
 import (
-	"api/internal/tester"
-	"api/pkg/auth"
-	"api/pkg/util"
-	"api/users/commands"
-	"api/users/db"
-	"api/users/entities"
+	"example/internal/tester"
+	"github.com/GabrielCarpr/cqrs/auth"
+	"example/pkg/util"
+	"example/users/commands"
+	"example/users/db"
+	"example/users/entities"
 	"testing"
 
 	"github.com/google/uuid"

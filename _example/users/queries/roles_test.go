@@ -1,10 +1,10 @@
 package queries_test
 
 import (
-	"api/internal/tester"
-	"api/pkg/auth"
-	"api/users/entities"
-	"api/users/queries"
+	"example/internal/tester"
+	"github.com/GabrielCarpr/cqrs/auth"
+	"example/users/entities"
+	"example/users/queries"
 	"testing"
 
 	"github.com/google/uuid"

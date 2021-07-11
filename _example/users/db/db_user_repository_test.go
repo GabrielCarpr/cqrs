@@ -1,10 +1,10 @@
 package db_test
 
 import (
-	"api/internal/support"
-	"api/internal/tester"
-	"api/users/db"
-	"api/users/entities"
+	"example/internal/support"
+	"example/internal/tester"
+	"example/users/db"
+	"example/users/entities"
 	"github.com/stretchr/testify/suite"
 	"testing"
 )

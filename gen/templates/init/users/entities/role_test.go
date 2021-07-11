@@ -1,7 +1,7 @@
 package entities_test
 
 import (
-	"api/users/entities"
+	"{{ .Module }}}}/users/entities"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
