@@ -52,7 +52,7 @@ jobs:
       DB_NAME: "cqrs"
       DB_PASS: "cqrs"
       SECRET_KEY: "secret"
-      MIGRATIONS: "$GITHUB_WORKSPACE/migrations"
+      MIGRATIONS: "~/work/cqrs/cqrs/_example/migrations"
     services:
       db:
         image: postgres:13.2
