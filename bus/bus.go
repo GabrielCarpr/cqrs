@@ -11,6 +11,7 @@ import (
 
 	"github.com/GabrielCarpr/cqrs/bus/message"
 	"github.com/GabrielCarpr/cqrs/log"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/sarulabs/di/v2"
 )
@@ -47,12 +48,11 @@ func New(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, os.Kill)
 	b := &Bus{
 		routes:    NewMessageRouter(),
-		Container: c,
+		container: c,
 		queue:     nil,
 		ctx:       ctx,
 		ctxCancel: cancel,
-		workers:   make([]func(), 0),
-		deletions: make([]func(), 0),
+		plugins:   make([]Plugin, 0),
 	}
 
 	for _, conf := range configs {
@@ -83,72 +83,84 @@ func New(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 // or asynchronously
 type Bus struct {
 	routes    MessageRouter
-	Container di.Container
+	container di.Container
 	queue     Queue
 	ctx       context.Context
 	ctxCancel context.CancelFunc
-
-	workers   []func()
-	deletions []func()
 
 	commandGuards     []CommandGuard
 	queryGuards       []QueryGuard
 	commandMiddleware []CommandMiddleware
 	queryMiddleware   []QueryMiddleware
+
+	plugins []Plugin
 }
 
 // Close deletes all the container resources.
 func (b *Bus) Close() {
 	log.Info(b.ctx, "Closing bus", log.F{})
 	defer b.ctxCancel()
-	for _, del := range b.deletions {
-		del()
+	for _, plugin := range b.plugins {
+		plugin.Close()
 	}
 	if b.queue != nil {
 		b.queue.Close()
 	}
-	b.Container.Delete()
+	b.container.Delete()
 	Instance = nil
 }
 
 // Work runs the bus in subscribe mode, to be ran as on a worker
 // node, or in the background on an API server
 func (b *Bus) Work() {
-	for _, work := range b.workers {
-		work()
+	group, ctx := errgroup.WithContext(b.ctx)
+
+	for _, plugin := range b.plugins {
+		group.Go(func() error {
+			err := plugin.Work(ctx)
+			return err
+		})
 	}
 
-	// The queue blocks. The ctx will signal cancellation, and then it will unblock
-	b.queue.Subscribe(b.ctx, func(ctx context.Context, msg message.Message) error {
-		return b.routeFromQueue(ctx, msg)
+	group.Go(func() error {
+		// The queue blocks. The ctx will signal cancellation, and then it will unblock
+		b.queue.Subscribe(b.ctx, func(ctx context.Context, msg message.Message) error {
+			return b.routeFromQueue(ctx, msg)
+		})
+		return nil
 	})
 
+	if err := group.Wait(); err != nil {
+		b.Close()
+		panic(err)
+	}
 	b.Close()
 }
 
+// Get returns an (unscoped) service from the container
 func (b *Bus) Get(key interface{}) interface{} {
 	switch key := key.(type) {
 	case string:
-		return b.Container.UnscopedGet(key)
+		return b.container.UnscopedGet(key)
 	case CommandHandler:
-		return b.Container.UnscopedGet(CommandHandlerName(key))
+		return b.container.UnscopedGet(CommandHandlerName(key))
 	case QueryHandler:
-		return b.Container.UnscopedGet(QueryHandlerName(key))
+		return b.container.UnscopedGet(QueryHandlerName(key))
 	default:
 		panic(fmt.Sprintf("Cannot use %s as a key", reflect.TypeOf(key)))
 	}
 }
 
-// RegisterDeletion allows a plugin to register a function to
-// clean itself up.
-func (b *Bus) RegisterDeletion(fn func()) {
-	b.deletions = append(b.deletions, fn)
-}
-
-// RegisterWork allows plugins to register a function for themselves
-// that the bus should call when in worker mode
-func (b *Bus) RegisterWork(fn func()) {
-	b.workers = append(b.workers, fn)
+// RegisterPlugins registers a plugin struct with the bus
+func (b *Bus) RegisterPlugins(plugins ...Plugin) {
+	for _, plugin := range plugins {
+		b.plugins = append(b.plugins, plugin)
+		b.Use(plugin.Middleware()...)
+		plugin.Attach(func(ctx context.Context, c Command) error {
+			_, err := b.Dispatch(ctx, c, false)
+			return err
+		})
+	}
 }
 
 // ExtendEvents extends the Bus EventRules
@@ -349,7 +361,7 @@ func (b *Bus) runQueryGuards(ctx context.Context, q Query) (context.Context, Que
 
 // handleEvent handles a queued event
 func (b *Bus) handleEvent(ctx context.Context, e queuedEvent, allowAsync bool) ([]message.Message, error) {
-	handler := b.Container.Get(e.Handler).(EventHandler)
+	handler := b.container.Get(e.Handler).(EventHandler)
 	if allowAsync && handler.Async() {
 		log.Info(ctx, "Queuing event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(e.Handler).String()})
 		err := b.queue.Publish(ctx, e)

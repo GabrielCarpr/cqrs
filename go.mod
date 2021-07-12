@@ -17,4 +17,5 @@ require (
 	github.com/sarulabs/di/v2 v2.4.2
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 )

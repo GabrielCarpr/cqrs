@@ -23,7 +23,10 @@ func TestCtrlRunsEmptyWithoutPanic(t *testing.T) {
 	_, ctrl := setupCtrl(t)
 	ctrl.LoopSeconds = 1
 
-	ctrl.Block(2)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+
+	ctrl.Run(ctx)
 }
 
 func TestCtrlHappyPath(t *testing.T) {
@@ -44,9 +47,16 @@ func TestCtrlHappyPath(t *testing.T) {
 		testVal = "hello world"
 		return nil
 	})
-	ctrl.Block(2)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	go func() {
+		ctrl.Run(ctx)
+	}()
+	time.Sleep(time.Second * 2)
 	ctrl.FinishTaskForJob(job.ID)
-	ctrl.Block(1)
+	time.Sleep(time.Second)
+	cancel()
 
 	job, err = repo.GetOne(job.ID)
 	assert.Nil(t, err)

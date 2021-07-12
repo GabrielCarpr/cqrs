@@ -1,8 +1,11 @@
 package background
 
 import (
+	"context"
 	"fmt"
 	"os"
+
+	"github.com/GabrielCarpr/cqrs/bus"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/sarulabs/di/v2"
@@ -61,28 +64,29 @@ func Build(c Config) *Service {
 
 	ctn := builder.Build()
 
-	return &Service{ctn}
+	return &Service{ctn: ctn}
 }
 
+var _ bus.Plugin = (*Service)(nil)
+
 type Service struct {
-	ctn di.Container
+	ctn    di.Container
+	cancel context.CancelFunc
 }
 
 func (s *Service) Controller() *Controller {
 	return s.ctn.Get("controller").(*Controller)
 }
 
-func (s *Service) AttachRouter(qa queueAction) {
+func (s *Service) Attach(qa queueAction) {
 	s.Controller().RegisterQueueAction(qa)
 }
 
-func (s *Service) Work(block bool) {
-	if block {
-		s.Controller().Block(0)
-	} else {
-		c := make(chan bool)
-		s.Controller().Run(c)
-	}
+// Work blocks until the context cancels, or the worker exits
+func (s *Service) Work(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	s.cancel = cancel
+	return s.Controller().Run(ctx)
 }
 
 func (s *Service) RegisterJob(j Job) error {
@@ -90,6 +94,12 @@ func (s *Service) RegisterJob(j Job) error {
 	return repo.Store(j)
 }
 
-func (s *Service) Delete() {
+func (s *Service) Close() error {
+	s.cancel()
 	s.ctn.Delete()
+	return nil
+}
+
+func (s *Service) Middleware() []interface{} {
+	return []interface{}{s.Controller().JobFinishingMiddleware}
 }
