@@ -29,7 +29,7 @@ func Get(ctx context.Context, key string) interface{} {
 
 // queryContainerGuard scopes the bus DI container, and injects it into the context
 func (b *Bus) queryContainerGuard(ctx context.Context, q Query) (context.Context, Query, error) {
-	requestCtn, _ := b.Container.SubContainer()
+	requestCtn, _ := b.container.SubContainer()
 	ctx = context.WithValue(ctx, ctxCtnKey, requestCtn)
 	return ctx, q, nil
 }
@@ -47,7 +47,7 @@ func (b *Bus) queryContainerMiddleware(next QueryHandler) QueryHandler {
 
 // commandContainerGuard scopes the bus DI container, and injects it into the context
 func (b *Bus) commandContainerGuard(ctx context.Context, c Command) (context.Context, Command, error) {
-	requestCtn, _ := b.Container.SubContainer()
+	requestCtn, _ := b.container.SubContainer()
 	ctx = context.WithValue(ctx, ctxCtnKey, requestCtn)
 	return ctx, c, nil
 }

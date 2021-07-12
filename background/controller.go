@@ -7,16 +7,13 @@ import (
 	"github.com/GabrielCarpr/cqrs/bus"
 	"github.com/GabrielCarpr/cqrs/bus/message"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 // queueAction is a callback from Messenger that allows JobController to queue tasks.
-type queueAction func(context.Context, bus.Command) error
+type queueAction = func(context.Context, bus.Command) error
 
 // NewController returns a new controller.
 func NewController(r *Repository) *Controller {
@@ -38,7 +35,7 @@ type Controller struct {
 	actions  []func() error
 }
 
-// registerQueueAction attaches the QA callback
+// RegisterQueueAction attaches the QA callback
 func (c *Controller) RegisterQueueAction(qa queueAction) {
 	c.queueTask = qa
 }
@@ -57,33 +54,30 @@ func (c *Controller) init() {
 	}
 }
 
-// Run asynchronously runs the control loop, receiving a done signal.
-func (c *Controller) Run(done chan bool) {
+// Run synchronously runs the control loop, receiving a done signal.
+func (c *Controller) Run(ctx context.Context) error {
 	log.Print("Starting job control loop")
 	ticker := time.NewTicker(time.Second * time.Duration(c.LoopSeconds))
+	defer ticker.Stop()
 	failures := 0
 	failureLimit := 10
 
-	go func() {
-		for {
-			select {
-			case <-done:
-				ticker.Stop()
-				return
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
 
-			case <-ticker.C:
-				errs := c.runActions()
-				for _, err := range errs {
-					failures++
-					log.Printf("Error during action: %v", err)
-				}
-				if failures >= failureLimit {
-					ticker.Stop()
-					panic("Too many errors - stopping")
-				}
+		case <-ticker.C:
+			errs := c.runActions()
+			for _, err := range errs {
+				failures++
+				log.Printf("Error during action: %v", err)
+			}
+			if failures >= failureLimit {
+				return errors.New("Too many action failures")
 			}
 		}
-	}()
+	}
 }
 
 func (c *Controller) runActions() (errors []error) {
@@ -107,22 +101,6 @@ func (c *Controller) registerActions() {
 
 	c.actions[0] = c.manageJobs
 	c.actions[1] = c.manageExecutions
-}
-
-// Block optionally runs the control loop, while blocking.
-func (c *Controller) Block(seconds int) {
-	done := make(chan bool)
-	c.Run(done)
-	if seconds == 0 {
-		sigChan := make(chan os.Signal)
-		signal.Notify(sigChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-		<-sigChan
-		done <- true
-		return
-	}
-	time.Sleep(time.Duration(seconds*1000) * time.Millisecond)
-	done <- true
-	return
 }
 
 // manageJobs manages all of the workers job entries
