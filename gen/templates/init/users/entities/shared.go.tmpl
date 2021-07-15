@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"encoding/json"
+	"errors"
 )
 
 func NewRoleID(name string) RoleID {
@@ -45,7 +46,20 @@ func (r *RoleID) UnmarshalGraphQL(input interface{}) error {
 	}
 }
 
+func (r *RoleID) Bind(data interface{}) error {
+	str, ok := data.(string)
+	if !ok {
+		return errors.New("RoleID is not string")
+	}
+	(*r).Name = str
+	return nil
+}
+
 // Scope is an access that is provided to a user by some mean
 type Scope struct {
 	Name string
+}
+
+func (s Scope) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.Name)
 }

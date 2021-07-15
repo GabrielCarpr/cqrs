@@ -58,10 +58,33 @@ func New(b *bus.Bus, secret string) *adapter.Server {
             c.JSON(http.StatusOK, res)
         }
     })
-    server.Map("GET", "/rest/v1/users/:id", func (b *bus.Bus) gin.HandlerFunc {
+    server.Map("GET", "/rest/v1/users/:ID", func (b *bus.Bus) gin.HandlerFunc {
         return func(c *gin.Context) {
             query := ddfedaff.User{}
             result := efebecad.User{}
+            if err := adapter.MustBind(c, &query); err != nil {
+                return
+            }
+
+            err := b.Query(c.Request.Context(), query, &result)
+            if err == nil {
+                c.JSON(http.StatusOK, result)
+                return
+            }
+            switch err := err.(type) {
+            case cqrsErrs.Error:
+                c.JSON(err.Code, err)
+                return
+            default:
+                c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
+                return
+            }
+        }
+    },server.Auth())
+    server.Map("GET", "/rest/v1/roles/:ID", func (b *bus.Bus) gin.HandlerFunc {
+        return func(c *gin.Context) {
+            query := ddfedaff.Role{}
+            result := efebecad.Role{}
             if err := adapter.MustBind(c, &query); err != nil {
                 return
             }

@@ -75,6 +75,8 @@ func unmarshalDecodeHook(from reflect.Type, to reflect.Type, data interface{}) (
 	return target, nil
 }
 
+// Binder should be implemented on structs with embedded scalar
+// to aid binding, such a value objects
 type Binder interface {
 	Bind(interface{}) error
 }

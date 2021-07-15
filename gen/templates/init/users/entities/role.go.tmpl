@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/GabrielCarpr/cqrs/bus"
 	"strings"
+	"encoding/json"
 )
 
 /*
@@ -63,12 +64,23 @@ func CreateRole(label string) Role {
 
 // Role is a user provided role in the access control system
 type Role struct {
-	ID    RoleID `json:"id"`
-	Label string
+	ID    RoleID `json:"ID"`
+	Label string `json:"label"`
 
 	scopes map[string]Scope
 
-	bus.EventQueue
+	bus.EventQueue `json:"-"`
+}
+
+func (r Role) MarshalJSON() ([]byte, error) {
+	type Alias Role
+	return json.Marshal(struct {
+		Scopes []Scope `json:"scopes"`
+		Alias
+	}{
+		Scopes: r.Scopes(),
+		Alias: (Alias)(r),
+	})
 }
 
 // Scopes returns the role's scopes
