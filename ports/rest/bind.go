@@ -2,12 +2,22 @@ package rest
 
 import (
 	"errors"
+	"net/http"
 	"net/url"
 	"reflect"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mitchellh/mapstructure"
 )
+
+// MustBind calls binds and aborts the request if an error is raised
+func MustBind(c *gin.Context, target interface{}) error {
+	if err := Bind(c, target); err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+		return err
+	}
+	return nil
+}
 
 // Bind maps a request onto a command/query/event
 func Bind(c *gin.Context, target interface{}) error {

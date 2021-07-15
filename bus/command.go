@@ -42,7 +42,7 @@ func (c CommandType) Auth(ctx context.Context) [][]string {
 // CommandResponse originates from a command when it is executed
 // synchronously. If async, then the response cannot be provided.
 type CommandResponse struct {
-	Error error
+	Error error `json:"error"`
 	ID    string
 }
 

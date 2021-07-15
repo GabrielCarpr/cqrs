@@ -16,7 +16,7 @@ func Execute() {
 
 	switch os.Args[1] {
 	case "gen":
-		gen.Graphql()
+		gen.Gen(os.Args[2:]...)
 	case "make":
 		make.Make(os.Args[2:]...)
 	case "init":

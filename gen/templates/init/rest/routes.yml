@@ -1,0 +1,17 @@
+---
+routes:
+- path: /rest/v1/auth/login
+  method: POST
+  query: 
+    question: {{ .Module }}/users/queries.Login
+    answer: {{ .Module }}/users/readmodels.Authentication
+
+- path: /rest/v1/auth/register
+  method: POST
+  command: {{ .Module }}/users/commands.Register
+
+- path: /rest/v1/users/:email
+  method: GET
+  query:
+    question: {{ .Module }}/users/queries.User
+    answer: {{ .Module }}/users/entities.User

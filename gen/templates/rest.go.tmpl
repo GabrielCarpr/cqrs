@@ -1,0 +1,76 @@
+package rest
+
+import (
+    "github.com/GabrielCarpr/cqrs/bus"
+    adapter "github.com/GabrielCarpr/cqrs/ports/rest"
+    cqrsErrs "github.com/GabrielCarpr/cqrs/errors"
+    "net/http"
+
+    {{- range $pkg, $alias := .Imports }}
+    {{ $alias }} "{{ $pkg }}"
+    {{- end }}
+
+    "github.com/gin-gonic/gin"
+)
+
+func New(b *bus.Bus) *adapter.Server {
+    s := adapter.NewServer(b)
+
+    {{- range $route := .Routes }}
+    {{- if not (eq $route.Command "") }}
+    s.Map("{{ $route.Method }}", "{{ $route.Path }}", func (b *bus.Bus) gin.HandlerFunc {
+        return func(c *gin.Context) {
+            cmd := {{ alias $route.Command }}.{{ structName $route.Command }}{}
+            if err := adapter.MustBind(c, &cmd); err != nil {
+                return
+            }
+
+            res, err := b.Dispatch(c.Request.Context(), cmd, {{ not $route.Async }})
+            if err != nil {
+                if err, ok := err.(cqrsErrs.Error); ok {
+                    c.JSON(err.Code, err)
+                    return
+                }
+                c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
+                return
+            }
+
+            c.JSON(http.StatusOK, res)
+        }
+    })
+    {{- end }}
+
+    {{- if not (eq $route.Query.Question "") }}
+    s.Map("{{ $route.Method }}", "{{ $route.Path }}", func (b *bus.Bus) gin.HandlerFunc {
+        return func(c *gin.Context) {
+            query := {{ alias $route.Query.Question }}.{{ structName $route.Query.Question }}{}
+            result := {{ alias $route.Query.Answer }}.{{ structName $route.Query.Answer }}{}
+            if err := adapter.MustBind(c, &query); err != nil {
+                return
+            }
+
+            err := b.Query(c.Request.Context(), query, &result)
+            if err == nil {
+                c.JSON(http.StatusOK, result)
+            }
+            switch err := err.(type) {
+            case cqrsErrs.Error:
+                c.JSON(err.Code, err)
+                return
+            default:
+                c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
+                return
+            }
+        }
+    })
+    {{- end }}
+    {{- end }}
+
+    return s
+}
+
+TODO:
+- Auth
+- Query param allowance
+- Test nil on commands/queries
+- Support support.ID for test app

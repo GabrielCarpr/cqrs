@@ -7,13 +7,13 @@ import (
 	"github.com/GabrielCarpr/cqrs/bus"
 	"github.com/GabrielCarpr/cqrs/log"
 	"github.com/GabrielCarpr/cqrs/bus/queue/sql"
+	"{{ .Module }}/rest"
 	"{{ .Module }}/users"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
 	stdlog "log"
-	"net/http"
 	"os/signal"
 	"os"
 
@@ -59,17 +59,18 @@ func Make(ctx context.Context) *App {
 		return uuid.MustParse(string(j))
 	})
 
-	app := App{Bus: b}
+	app := App{Bus: b, ctx: ctx}
 	return &app
 }
 
 type App struct {
 	Bus    *bus.Bus
+	ctx context.Context
 }
 
 func (a *App) Handle() {
-	mux := http.NewServeMux()
-	stdlog.Fatal(http.ListenAndServe(":80", mux))
+	server := rest.Rest(a.Bus)
+	stdlog.Fatal(server.Run(a.ctx))
 }
 
 func (a *App) Work() {
