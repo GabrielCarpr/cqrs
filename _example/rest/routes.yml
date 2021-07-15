@@ -24,3 +24,31 @@ routes:
     answer: example/users/entities.Role
   middleware: ["Auth"]
 
+- path: /rest/v1/users
+  method: GET
+  query:
+    question: example/users/queries.Users
+    answer: example/internal/support.PaginatedQuery
+  middleware: ["Auth"]
+
+- path: /rest/v1/roles
+  method: GET
+  query:
+    question: example/users/queries.Roles
+    answer: example/internal/support.PaginatedQuery
+  middleware: ["Auth"]
+
+- path: /rest/v1/roles
+  method: POST
+  command: example/users/commands.CreateRole
+  middleware: ["Auth"]
+
+- path: /rest/v1/users
+  method: PUT
+  command: example/users/commands.UpdateUser
+  middleware: ["Auth"]
+
+- path: /rest/v1/roles
+  method: PUT
+  command: example/users/commands.UpdateRole
+  middlware: ["Auth"]
