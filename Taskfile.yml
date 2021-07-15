@@ -28,7 +28,7 @@ tasks:
     cmds:
       - rm -rf ./_example
       - cd gen; go run . init -module=example -root=../_example -example=true
-      - cd _example; go get -u github.com/GabrielCarpr/cqrs/gen; go generate ./...; go mod tidy; go build .
+      - cd _example; go get -u github.com/GabrielCarpr/cqrs/gen; go generate ./...; go mod tidy; go build example
     sources:
       - ./gen/templates/init/**/*.*
       - ./gen/init/**/*.go

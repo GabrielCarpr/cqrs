@@ -10,8 +10,9 @@ routes:
   method: POST
   command: {{ .Module }}/users/commands.Register
 
-- path: /rest/v1/users/:email
+- path: /rest/v1/users/:id
   method: GET
   query:
     question: {{ .Module }}/users/queries.User
     answer: {{ .Module }}/users/entities.User
+  middleware: ["Auth"]

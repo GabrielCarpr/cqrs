@@ -39,6 +39,9 @@ func (r routes) Imports() map[string]string {
 		case route.Event != "":
 			names = append(names, route.Event)
 		}
+		for _, mw := range route.Middleware {
+			names = append(names, mw)
+		}
 	}
 	return imports(names...)
 }
@@ -51,8 +54,9 @@ type route struct {
 		Question string `yaml:"question"`
 		Answer   string `yaml:"answer"`
 	} `yaml:"query"`
-	Event string `yaml:"event"`
-	Async bool   `yaml:"async"`
+	Event      string   `yaml:"event"`
+	Async      bool     `yaml:"async"`
+	Middleware []string `yaml:"middleware,flow"`
 }
 
 func (r route) valid() error {
@@ -81,6 +85,14 @@ func (r route) valid() error {
 	return nil
 }
 
+func server(name string) string {
+	pkg := packageName(name)
+	if pkg == homePkg {
+		return "server"
+	}
+	return alias(name)
+}
+
 func rest(routesPath string) {
 	filename := strings.Replace(filepath.Base(routesPath), ".yml", "", 1)
 	r, err := ioutil.ReadFile(routesPath)
@@ -101,12 +113,11 @@ func rest(routesPath string) {
 		"packageName": packageName,
 		"structName":  structName,
 		"alias":       alias,
+		"server":      server,
 	}).ParseFS(templates.Templates, "rest.go.tmpl")
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	templ = templ
 
 	buf := bytes.NewBuffer([]byte{})
 	err = templ.Execute(buf, config)

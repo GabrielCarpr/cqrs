@@ -69,7 +69,7 @@ type App struct {
 }
 
 func (a *App) Handle() {
-	server := rest.Rest(a.Bus)
+	server := rest.Rest(a.Bus, config.Values.Secret)
 	stdlog.Fatal(server.Run(a.ctx))
 }
 

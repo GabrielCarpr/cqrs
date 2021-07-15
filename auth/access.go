@@ -3,9 +3,10 @@ package auth
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/GabrielCarpr/cqrs/errors"
 	"golang.org/x/crypto/bcrypt"
-	"strings"
 
 	"github.com/google/uuid"
 )
@@ -16,6 +17,9 @@ var (
 
 	// Forbidden is an error returned when access is denied
 	Forbidden = errors.Error{Code: 403, Message: "Forbidden"}
+
+	// BlankCredentials are carried by unauthenticated users of the system
+	BlankCredentials = Credentials{}
 )
 
 type authCtxKeyType string

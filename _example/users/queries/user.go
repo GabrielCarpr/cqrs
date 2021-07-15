@@ -23,7 +23,7 @@ type User struct {
 	bus.QueryType
 
 	Email *string     `json:"email"`
-	ID    *support.ID `json:"ID"`
+	ID    *support.ID `json:"id" cqrs:"id"`
 }
 
 func (User) Query() string {

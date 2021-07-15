@@ -13,12 +13,12 @@ import (
     "github.com/gin-gonic/gin"
 )
 
-func New(b *bus.Bus) *adapter.Server {
-    s := adapter.NewServer(b)
+func New(b *bus.Bus, secret string) *adapter.Server {
+    server := adapter.NewServer(b, secret)
 
     {{- range $route := .Routes }}
     {{- if not (eq $route.Command "") }}
-    s.Map("{{ $route.Method }}", "{{ $route.Path }}", func (b *bus.Bus) gin.HandlerFunc {
+    server.Map("{{ $route.Method }}", "{{ $route.Path }}", func (b *bus.Bus) gin.HandlerFunc {
         return func(c *gin.Context) {
             cmd := {{ alias $route.Command }}.{{ structName $route.Command }}{}
             if err := adapter.MustBind(c, &cmd); err != nil {
@@ -37,11 +37,11 @@ func New(b *bus.Bus) *adapter.Server {
 
             c.JSON(http.StatusOK, res)
         }
-    })
+    }{{- range $mw := $route.Middleware -}},{{- server $mw -}}.{{- structName $mw -}}(){{- end -}})
     {{- end }}
 
     {{- if not (eq $route.Query.Question "") }}
-    s.Map("{{ $route.Method }}", "{{ $route.Path }}", func (b *bus.Bus) gin.HandlerFunc {
+    server.Map("{{ $route.Method }}", "{{ $route.Path }}", func (b *bus.Bus) gin.HandlerFunc {
         return func(c *gin.Context) {
             query := {{ alias $route.Query.Question }}.{{ structName $route.Query.Question }}{}
             result := {{ alias $route.Query.Answer }}.{{ structName $route.Query.Answer }}{}
@@ -62,15 +62,9 @@ func New(b *bus.Bus) *adapter.Server {
                 return
             }
         }
-    })
+    }{{- range $mw := $route.Middleware -}},{{- server $mw -}}.{{- structName $mw -}}(){{- end -}})
     {{- end }}
     {{- end }}
 
-    return s
+    return server
 }
-
-TODO:
-- Auth
-- Query param allowance
-- Test nil on commands/queries
-- Support support.ID for test app

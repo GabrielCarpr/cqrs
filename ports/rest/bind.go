@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -48,6 +49,8 @@ func Bind(c *gin.Context, target interface{}) error {
 		WeaklyTypedInput: true,
 		Result:           target,
 		TagName:          "cqrs",
+		Squash:           true,
+		DecodeHook:       mapstructure.ComposeDecodeHookFunc(unmarshalDecodeHook),
 	})
 	if err != nil {
 		return err
@@ -58,6 +61,20 @@ func Bind(c *gin.Context, target interface{}) error {
 	}
 
 	return nil
+}
+
+func unmarshalDecodeHook(from reflect.Type, to reflect.Type, data interface{}) (interface{}, error) {
+	if !(from.Kind() == reflect.String && to.Kind() == reflect.Struct) {
+		return data, nil
+	}
+	if !to.Implements(reflect.TypeOf((*json.Marshaler)(nil))) {
+		return data, nil
+	}
+
+	result := reflect.New(from)
+	target := result.Elem().Interface().(json.Unmarshaler)
+	target.UnmarshalJSON([]byte(data.(string)))
+	return target, nil
 }
 
 func bindJSON(c *gin.Context, target *map[string]interface{}) error {

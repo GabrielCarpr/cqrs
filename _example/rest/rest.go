@@ -7,6 +7,6 @@ import (
 
 //go:generate go run github.com/GabrielCarpr/cqrs/gen gen rest routes.yml
 
-func Rest(b *bus.Bus) *rest.Server {
-    return New(b)
+func Rest(b *bus.Bus, secret string) *rest.Server {
+    return New(b, secret)
 }

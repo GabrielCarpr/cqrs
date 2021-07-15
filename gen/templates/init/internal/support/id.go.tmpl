@@ -21,7 +21,7 @@ func NewID() ID {
 }
 
 type ID struct {
-	uuid.UUID
+	uuid.UUID `cqrs:",squash"`
 }
 
 func (u *ID) UnmarshalGraphQL(input interface{}) error {
@@ -49,4 +49,13 @@ func (i ID) UID() uuid.UUID {
 
 func (i ID) Value() (driver.Value, error) {
 	return i.UUID.Value()
+}
+
+func (i *ID) UnmarshalJSON(data []byte) error {
+	id, err := ParseID(string(data))
+	if err != nil {
+		return err
+	}
+	*i = id
+	return nil
 }

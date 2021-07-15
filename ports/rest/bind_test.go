@@ -149,3 +149,75 @@ func (s BindTest) TestAllForRest() {
 	eng.ServeHTTP(resp, c.Request)
 	s.True(run)
 }
+
+type testQuery struct {
+	bus.QueryType
+
+	ID    *string
+	Email *string
+}
+
+func (s BindTest) TestBindOptional() {
+	q := testQuery{}
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	body, _ := json.Marshal(map[string]interface{}{
+		"ID": "abc",
+	})
+	c.Request = httptest.NewRequest("POST", "/v3/test", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	err := rest.Bind(c, &q)
+	s.NoError(err)
+	s.NotNil(q.ID)
+	s.Equal("abc", *q.ID)
+	s.Nil(q.Email)
+}
+
+func (s BindTest) TestBindURIOptional() {
+	q := testQuery{}
+	run := false
+
+	resp := httptest.NewRecorder()
+	c, eng := gin.CreateTestContext(resp)
+	eng.POST("/v3/:ID", func(c *gin.Context) {
+		err := rest.Bind(c, &q)
+		s.NoError(err)
+		s.NotNil(q.ID)
+		s.Equal("abc", *q.ID)
+		s.Nil(q.Email)
+		run = true
+	})
+	c.Request = httptest.NewRequest(
+		"POST",
+		"/v3/abc",
+		nil,
+	)
+
+	eng.ServeHTTP(resp, c.Request)
+	s.True(run)
+}
+
+type ID struct {
+	UUID string
+}
+
+type testCmd2 struct {
+	ID *ID `cqrs:"ID"`
+}
+
+func (s BindTest) TestBindEmbedded() {
+	cmd := testCmd2{}
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	body, _ := json.Marshal(map[string]interface{}{
+		"ID": "abc",
+	})
+	c.Request = httptest.NewRequest("POST", "/v3/test", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	err := rest.Bind(c, &cmd)
+	s.NoError(err)
+	s.Require().NotNil(cmd.ID)
+	s.Equal("abc", cmd.ID.UUID)
+}
