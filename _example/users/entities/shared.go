@@ -3,6 +3,7 @@ package entities
 import (
 	"database/sql/driver"
 	"fmt"
+	"encoding/json"
 )
 
 func NewRoleID(name string) RoleID {
@@ -22,7 +23,7 @@ func (r RoleID) String() string {
 }
 
 func (r RoleID) MarshalJSON() ([]byte, error) {
-	return []byte(r.String()), nil
+	return json.Marshal(r.Name)
 }
 
 func (r RoleID) Value() (driver.Value, error) {

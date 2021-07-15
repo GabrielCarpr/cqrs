@@ -51,8 +51,8 @@ func (i ID) Value() (driver.Value, error) {
 	return i.UUID.Value()
 }
 
-func (i *ID) UnmarshalJSON(data []byte) error {
-	id, err := ParseID(string(data))
+func (i *ID) Bind(data interface{}) error {
+	id, err := ParseID(data.(string))
 	if err != nil {
 		return err
 	}

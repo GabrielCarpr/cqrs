@@ -26,6 +26,7 @@ func New(b *bus.Bus, secret string) *adapter.Server {
             err := b.Query(c.Request.Context(), query, &result)
             if err == nil {
                 c.JSON(http.StatusOK, result)
+                return
             }
             switch err := err.(type) {
             case cqrsErrs.Error:
@@ -68,6 +69,7 @@ func New(b *bus.Bus, secret string) *adapter.Server {
             err := b.Query(c.Request.Context(), query, &result)
             if err == nil {
                 c.JSON(http.StatusOK, result)
+                return
             }
             switch err := err.(type) {
             case cqrsErrs.Error:

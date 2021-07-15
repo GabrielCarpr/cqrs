@@ -202,6 +202,12 @@ type ID struct {
 	UUID string
 }
 
+func (i *ID) Bind(data interface{}) error {
+	str := data.(string)
+	(*i).UUID = str
+	return nil
+}
+
 type testCmd2 struct {
 	ID *ID `cqrs:"ID"`
 }
@@ -219,5 +225,58 @@ func (s BindTest) TestBindEmbedded() {
 	err := rest.Bind(c, &cmd)
 	s.NoError(err)
 	s.Require().NotNil(cmd.ID)
+	s.Equal("abc", cmd.ID.UUID)
+}
+
+type IDs struct {
+	UUID []string
+}
+
+func (i *IDs) Bind(data interface{}) error {
+	var arr []string
+	err := json.Unmarshal([]byte(data.(string)), &arr)
+	if err != nil {
+		return err
+	}
+	(*i).UUID = arr
+	return nil
+}
+
+type testCmd3 struct {
+	ID *IDs `cqrs:"ID"`
+}
+
+func (s BindTest) TestBindEmbeddedArray() {
+	cmd := testCmd3{}
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	body, _ := json.Marshal(map[string]interface{}{
+		"ID": "[\"abc\",\"xyz\"]",
+	})
+	c.Request = httptest.NewRequest("POST", "/v3/test", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	err := rest.Bind(c, &cmd)
+	s.NoError(err)
+	s.Require().NotNil(cmd.ID)
+	s.Equal([]string{"abc", "xyz"}, cmd.ID.UUID)
+}
+
+type testCmd4 struct {
+	ID ID `cqrs:"ID"`
+}
+
+func (s BindTest) TestBindEmbeddedRequired() {
+	cmd := testCmd4{}
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	body, _ := json.Marshal(map[string]interface{}{
+		"ID": "abc",
+	})
+	c.Request = httptest.NewRequest("POST", "/v3/test", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	err := rest.Bind(c, &cmd)
+	s.NoError(err)
 	s.Equal("abc", cmd.ID.UUID)
 }

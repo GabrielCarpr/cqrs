@@ -3,6 +3,7 @@ package support
 import (
 	"example/internal/errs"
 	"strings"
+	"encoding/json"
 )
 
 // NewEmail creates an email value object
@@ -23,5 +24,10 @@ func (e Email) String() string {
 }
 
 func (e Email) MarshalJSON() ([]byte, error) {
-	return []byte(e.String()), nil
+	return json.Marshal(e.Email)
+}
+
+func (e *Email) Bind(data interface{}) error {
+	(*e).Email = data.(string)
+	return nil
 }

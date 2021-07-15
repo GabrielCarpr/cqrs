@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -64,17 +63,20 @@ func Bind(c *gin.Context, target interface{}) error {
 }
 
 func unmarshalDecodeHook(from reflect.Type, to reflect.Type, data interface{}) (interface{}, error) {
-	if !(from.Kind() == reflect.String && to.Kind() == reflect.Struct) {
+	if to.Kind() != reflect.Struct {
 		return data, nil
 	}
-	if !to.Implements(reflect.TypeOf((*json.Marshaler)(nil))) {
+	target, ok := reflect.New(to).Interface().(Binder)
+	if !ok {
 		return data, nil
 	}
 
-	result := reflect.New(from)
-	target := result.Elem().Interface().(json.Unmarshaler)
-	target.UnmarshalJSON([]byte(data.(string)))
+	target.Bind(data)
 	return target, nil
+}
+
+type Binder interface {
+	Bind(interface{}) error
 }
 
 func bindJSON(c *gin.Context, target *map[string]interface{}) error {
