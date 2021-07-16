@@ -15,6 +15,13 @@ import (
 
 func New(b *bus.Bus, config adapter.Config) *adapter.Server {
     server := adapter.NewServer(b, config)
+    var mode string
+    if config.Development {
+        mode = gin.DebugMode
+    } else {
+        mode = gin.ReleaseMode
+    }
+    gin.SetMode(mode)
     grp := server.Router.Group("")
 
     {{ template "restGroup" . }}
