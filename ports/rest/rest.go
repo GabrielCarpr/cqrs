@@ -23,7 +23,7 @@ func NewServer(b *bus.Bus, conf Config) *Server {
 
 type Server struct {
 	bus    *bus.Bus
-	router *gin.Engine
+	Router *gin.Engine
 	Config Config
 }
 
@@ -33,11 +33,11 @@ func (s *Server) Map(method string, route string, handler func(*bus.Bus) gin.Han
 		handlers[i] = mw
 	}
 	handlers[len(handlers)-1] = handler(s.bus)
-	s.router.Handle(method, route, handlers...)
+	s.Router.Handle(method, route, handlers...)
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	return s.router.Run()
+	return s.Router.Run()
 }
 
 func (s *Server) Auth() gin.HandlerFunc {

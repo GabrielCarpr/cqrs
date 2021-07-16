@@ -1,0 +1,55 @@
+{{ define "restGroup" }}
+func(grp gin.IRouter) {
+grp = grp.Group("{{- .Path -}}")
+{{ if len .Middleware -}}grp.Use({{- range $mw := .Middleware -}}{{- server $mw -}}.{{- structName $mw -}}(),{{- end -}}){{- end }}
+
+{{- range .Routes }}
+{{- if not (eq .Command "") }}
+grp.Handle("{{ .Method }}", "{{ .Path }}", func(c *gin.Context) {
+    cmd := {{ alias .Command }}.{{ structName .Command }}{}
+    if err := adapter.MustBind(c, &cmd); err != nil {
+        return
+    }
+    res, err := b.Dispatch(c.Request.Context(), cmd, {{ not .Async }})
+    if err != nil {
+        if err, ok := err.(cqrsErrs.Error); ok {
+            c.JSON(err.Code, err)
+            return
+        }
+        c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
+        return
+    }
+
+    c.JSON(http.StatusOK, res)
+})
+{{- end }}
+
+{{- if not (eq .Query.Question "") }}
+grp.Handle("{{ .Method }}", "{{ .Path }}", func (c *gin.Context) {
+    query := {{ alias .Query.Question }}.{{ structName .Query.Question }}{}
+    result := {{ alias .Query.Answer }}.{{ structName .Query.Answer }}{}
+    if err := adapter.MustBind(c, &query); err != nil {
+        return
+    }
+    err := b.Query(c.Request.Context(), query, &result)
+    if err == nil {
+        c.JSON(http.StatusOK, {{- if not (eq .Query.Adapter "") -}}{{- .Query.Adapter -}}{result}{{- else -}}result{{ end }})
+        return
+    }
+    switch err := err.(type) {
+    case cqrsErrs.Error:
+        c.JSON(err.Code, err)
+        return
+    default:
+        c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
+        return
+    }
+})
+{{- end }}
+{{- end }}
+
+{{- range .Groups }}
+    {{ template "restGroup" . }}
+{{- end -}}
+}(grp)
+{{ end }}

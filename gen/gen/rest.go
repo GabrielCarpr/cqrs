@@ -14,22 +14,30 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type routes struct {
-	Routes []route `yaml:"routes,flow"`
+type group struct {
+	Path       string   `yaml:"path"`
+	Middleware []string `yaml:"middleware,flow"`
+	Groups     []group  `yaml:"groups,flow"`
+	Routes     []route  `yaml:"routes,flow"`
 }
 
-func (r routes) valid() error {
-	for _, route := range r.Routes {
+func (g group) valid() error {
+	for _, route := range g.Routes {
 		if err := route.valid(); err != nil {
+			return err
+		}
+	}
+	for _, group := range g.Groups {
+		if err := group.valid(); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r routes) Imports() map[string]string {
+func (g group) imports() []string {
 	names := []string{}
-	for _, route := range r.Routes {
+	for _, route := range g.Routes {
 		switch true {
 		case route.Command != "":
 			names = append(names, route.Command)
@@ -39,11 +47,19 @@ func (r routes) Imports() map[string]string {
 		case route.Event != "":
 			names = append(names, route.Event)
 		}
-		for _, mw := range route.Middleware {
-			names = append(names, mw)
-		}
 	}
-	return imports(names...)
+	for _, mw := range g.Middleware {
+		names = append(names, mw)
+	}
+	for _, grp := range g.Groups {
+		names = append(names, grp.imports()...)
+	}
+	return names
+}
+
+func (g group) Imports() map[string]string {
+
+	return imports(g.imports()...)
 }
 
 type route struct {
@@ -103,7 +119,7 @@ func rest(routesPath string) {
 		log.Fatal(err)
 	}
 
-	config := routes{}
+	config := group{}
 	err = yaml.Unmarshal(r, &config)
 	if err != nil {
 		log.Fatal(err)
@@ -117,7 +133,7 @@ func rest(routesPath string) {
 		"structName":  structName,
 		"alias":       alias,
 		"server":      server,
-	}).ParseFS(templates.Templates, "rest.go.tmpl")
+	}).ParseFS(templates.Templates, "rest.go.tmpl", "restGroup.go.tmpl")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,50 +1,49 @@
 ---
-routes:
-- path: /rest/v1/auth/register
-  method: POST
-  command: {{ .Module }}/users/commands.Register
+path: /rest/v1
 
-- path: /rest/v1/users/:ID
-  method: GET
-  query:
-    question: {{ .Module }}/users/queries.User
-    answer: {{ .Module }}/users/entities.User
-  middleware: ["Auth"]
+groups:
+- path: /auth
+  routes:
+  - path: /register
+    method: POST
+    command: {{ .Module }}/users/commands.Register
 
-- path: /rest/v1/roles/:ID
-  method: GET
-  query:
-    question: {{ .Module }}/users/queries.Role
-    answer: {{ .Module }}/users/entities.Role
-    adapter: roleAdapter
-  middleware: ["Auth"]
+- middleware: ["Auth"]
+  groups:
+  - path: /users
+    routes:
+    - path: /:ID
+      method: GET
+      query:
+        question: {{ .Module }}/users/queries.User
+        answer: {{ .Module }}/users/entities.User
+    - path: /
+      method: GET
+      query:
+        question: {{ .Module }}/users/queries.Users
+        answer: {{ .Module }}/internal/support.PaginatedQuery
+    - path: /:ID
+      method: PUT
+      command: {{ .Module }}/users/commands.UpdateUser
+  
+  - path: /roles
+    routes:
+    - path: /:ID
+      method: GET
+      query:
+        question: {{ .Module }}/users/queries.Role
+        answer: {{ .Module }}/users/entities.Role
+        adapter: roleAdapter
+    - path: /
+      method: GET
+      query:
+        question: {{ .Module }}/users/queries.Roles
+        answer: {{ .Module }}/internal/support.PaginatedQuery
+        adapter: rolesAdapter
+    - path: /:ID
+      method: PUT
+      command: {{ .Module }}/users/commands.UpdateRole
+    - path: /
+      method: POST
+      command: {{ .Module }}/users/commands.CreateRole
 
-- path: /rest/v1/users
-  method: GET
-  query:
-    question: {{ .Module }}/users/queries.Users
-    answer: {{ .Module }}/internal/support.PaginatedQuery
-  middleware: ["Auth"]
-
-- path: /rest/v1/roles
-  method: GET
-  query:
-    question: {{ .Module }}/users/queries.Roles
-    answer: {{ .Module }}/internal/support.PaginatedQuery
-    adapter: rolesAdapter
-  middleware: ["Auth"]
-
-- path: /rest/v1/roles
-  method: POST
-  command: {{ .Module }}/users/commands.CreateRole
-  middleware: ["Auth"]
-
-- path: /rest/v1/users
-  method: PUT
-  command: {{ .Module }}/users/commands.UpdateUser
-  middleware: ["Auth"]
-
-- path: /rest/v1/roles
-  method: PUT
-  command: {{ .Module }}/users/commands.UpdateRole
-  middlware: ["Auth"]

@@ -15,57 +15,9 @@ import (
 
 func New(b *bus.Bus, config adapter.Config) *adapter.Server {
     server := adapter.NewServer(b, config)
+    grp := server.Router.Group("")
 
-    {{- range $route := .Routes }}
-    {{- if not (eq $route.Command "") }}
-    server.Map("{{ $route.Method }}", "{{ $route.Path }}", func (b *bus.Bus) gin.HandlerFunc {
-        return func(c *gin.Context) {
-            cmd := {{ alias $route.Command }}.{{ structName $route.Command }}{}
-            if err := adapter.MustBind(c, &cmd); err != nil {
-                return
-            }
-
-            res, err := b.Dispatch(c.Request.Context(), cmd, {{ not $route.Async }})
-            if err != nil {
-                if err, ok := err.(cqrsErrs.Error); ok {
-                    c.JSON(err.Code, err)
-                    return
-                }
-                c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
-                return
-            }
-
-            c.JSON(http.StatusOK, res)
-        }
-    }{{- range $mw := $route.Middleware -}},{{- server $mw -}}.{{- structName $mw -}}(){{- end -}})
-    {{- end }}
-
-    {{- if not (eq $route.Query.Question "") }}
-    server.Map("{{ $route.Method }}", "{{ $route.Path }}", func (b *bus.Bus) gin.HandlerFunc {
-        return func(c *gin.Context) {
-            query := {{ alias $route.Query.Question }}.{{ structName $route.Query.Question }}{}
-            result := {{ alias $route.Query.Answer }}.{{ structName $route.Query.Answer }}{}
-            if err := adapter.MustBind(c, &query); err != nil {
-                return
-            }
-
-            err := b.Query(c.Request.Context(), query, &result)
-            if err == nil {
-                c.JSON(http.StatusOK, {{- if not (eq $route.Query.Adapter "") -}}{{- $route.Query.Adapter -}}{result}{{- else -}}result{{ end }})
-                return
-            }
-            switch err := err.(type) {
-            case cqrsErrs.Error:
-                c.JSON(err.Code, err)
-                return
-            default:
-                c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
-                return
-            }
-        }
-    }{{- range $mw := $route.Middleware -}},{{- server $mw -}}.{{- structName $mw -}}(){{- end -}})
-    {{- end }}
-    {{- end }}
+    {{ template "restGroup" . }}
 
     return server
 }
