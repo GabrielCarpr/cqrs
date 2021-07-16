@@ -1,10 +1,24 @@
 {{ define "restGroup" }}
 func(grp gin.IRouter) {
-grp = grp.Group("{{- .Path -}}")
-{{ if len .Middleware -}}grp.Use({{- range $mw := .Middleware -}}{{- server $mw -}}.{{- structName $mw -}}(),{{- end -}}){{- end }}
+    grp = grp.Group("{{- .Path -}}")
+    {{ if len .Middleware -}}grp.Use({{- range $mw := .Middleware -}}{{- server $mw -}}.{{- structName $mw -}}(),{{- end -}}){{- end }}
 
-{{- range .Routes }}
-{{- if not (eq .Command "") }}
+    {{- range .Routes }}
+        {{- if not (eq .Command "") }}
+            {{ template "command" . }}
+        {{- end }}
+        {{- if not (eq .Query.Question "") }}
+            {{ template "query" . }}
+        {{- end }}
+    {{- end }}
+
+    {{- range .Groups }}
+        {{ template "restGroup" . }}
+    {{- end -}}
+}(grp)
+{{ end }}
+
+{{ define "command" }}
 grp.Handle("{{ .Method }}", "{{ .Path }}", func(c *gin.Context) {
     cmd := {{ alias .Command }}.{{ structName .Command }}{}
     if err := adapter.MustBind(c, &cmd); err != nil {
@@ -22,9 +36,9 @@ grp.Handle("{{ .Method }}", "{{ .Path }}", func(c *gin.Context) {
 
     c.JSON(http.StatusOK, res)
 })
-{{- end }}
+{{ end }}
 
-{{- if not (eq .Query.Question "") }}
+{{ define "query" }}
 grp.Handle("{{ .Method }}", "{{ .Path }}", func (c *gin.Context) {
     query := {{ alias .Query.Question }}.{{ structName .Query.Question }}{}
     result := {{ alias .Query.Answer }}.{{ structName .Query.Answer }}{}
@@ -45,11 +59,4 @@ grp.Handle("{{ .Method }}", "{{ .Path }}", func (c *gin.Context) {
         return
     }
 })
-{{- end }}
-{{- end }}
-
-{{- range .Groups }}
-    {{ template "restGroup" . }}
-{{- end -}}
-}(grp)
 {{ end }}
