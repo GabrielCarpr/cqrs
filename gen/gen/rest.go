@@ -53,6 +53,7 @@ type route struct {
 	Query   struct {
 		Question string `yaml:"question"`
 		Answer   string `yaml:"answer"`
+		Adapter  string `yaml:"adapter"`
 	} `yaml:"query"`
 	Event      string   `yaml:"event"`
 	Async      bool     `yaml:"async"`
@@ -70,7 +71,7 @@ func (r route) valid() error {
 		selected++
 	}
 
-	switch true {
+	switch {
 	case r.Path == "":
 		return errors.New("Path must be specified")
 	case r.Method == "":
@@ -81,6 +82,8 @@ func (r route) valid() error {
 		return errors.New("Question cannot be empty when answer provided")
 	case r.Query.Question != "" && r.Query.Answer == "":
 		return errors.New("Answer cannot be empty when question provided")
+	case strings.Contains(r.Query.Adapter, "."):
+		return errors.New("Adapter must be in the same package")
 	}
 	return nil
 }

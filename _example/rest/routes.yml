@@ -16,6 +16,7 @@ routes:
   query:
     question: example/users/queries.Role
     answer: example/users/entities.Role
+    adapter: roleAdapter
   middleware: ["Auth"]
 
 - path: /rest/v1/users
@@ -30,6 +31,7 @@ routes:
   query:
     question: example/users/queries.Roles
     answer: example/internal/support.PaginatedQuery
+    adapter: rolesAdapter
   middleware: ["Auth"]
 
 - path: /rest/v1/roles

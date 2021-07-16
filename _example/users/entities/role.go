@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/GabrielCarpr/cqrs/bus"
 	"strings"
-	"encoding/json"
 )
 
 /*
@@ -70,17 +69,6 @@ type Role struct {
 	scopes map[string]Scope
 
 	bus.EventQueue `json:"-"`
-}
-
-func (r Role) MarshalJSON() ([]byte, error) {
-	type Alias Role
-	return json.Marshal(struct {
-		Scopes []Scope `json:"scopes"`
-		Alias
-	}{
-		Scopes: r.Scopes(),
-		Alias: (Alias)(r),
-	})
 }
 
 // Scopes returns the role's scopes

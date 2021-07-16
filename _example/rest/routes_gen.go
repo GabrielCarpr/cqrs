@@ -45,7 +45,7 @@ func New(b *bus.Bus, config adapter.Config) *adapter.Server {
 
             err := b.Query(c.Request.Context(), query, &result)
             if err == nil {
-                c.JSON(http.StatusOK, result)
+                c.JSON(http.StatusOK,result)
                 return
             }
             switch err := err.(type) {
@@ -68,7 +68,7 @@ func New(b *bus.Bus, config adapter.Config) *adapter.Server {
 
             err := b.Query(c.Request.Context(), query, &result)
             if err == nil {
-                c.JSON(http.StatusOK, result)
+                c.JSON(http.StatusOK,roleAdapter{result})
                 return
             }
             switch err := err.(type) {
@@ -91,7 +91,7 @@ func New(b *bus.Bus, config adapter.Config) *adapter.Server {
 
             err := b.Query(c.Request.Context(), query, &result)
             if err == nil {
-                c.JSON(http.StatusOK, result)
+                c.JSON(http.StatusOK,result)
                 return
             }
             switch err := err.(type) {
@@ -114,7 +114,7 @@ func New(b *bus.Bus, config adapter.Config) *adapter.Server {
 
             err := b.Query(c.Request.Context(), query, &result)
             if err == nil {
-                c.JSON(http.StatusOK, result)
+                c.JSON(http.StatusOK,rolesAdapter{result})
                 return
             }
             switch err := err.(type) {

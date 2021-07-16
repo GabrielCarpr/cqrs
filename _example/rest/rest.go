@@ -6,9 +6,12 @@ import (
     "example/internal/config"
     "example/users/queries"
     "example/users/readmodels"
+    "example/users/entities"
+    "example/internal/support"
     "github.com/gin-gonic/gin"
     "net/http"
     cqrsErrs "github.com/GabrielCarpr/cqrs/errors"
+    "encoding/json"
 )
 
 //go:generate go run github.com/GabrielCarpr/cqrs/gen gen rest routes.yml
@@ -30,7 +33,7 @@ func Rest(b *bus.Bus, config config.Config) *rest.Server {
 
             err := b.Query(c.Request.Context(), query, &result)
             if err == nil {
-                c.SetCookie("refresh", result.RefreshToken, 604800, "/", server.Config.URL, !server.Config.Development, true)
+                c.SetCookie("refresh", result.RefreshToken, 86400, "/", server.Config.URL, !server.Config.Development, true)
                 c.SetSameSite(http.SameSiteStrictMode)
                 c.JSON(http.StatusOK, result)
                 return
@@ -47,4 +50,34 @@ func Rest(b *bus.Bus, config config.Config) *rest.Server {
     })
 
     return server
+}
+
+type roleAdapter struct {
+    entities.Role
+}
+
+func (r roleAdapter) MarshalJSON() ([]byte, error) {
+	type Alias entities.Role
+	return json.Marshal(struct{
+		Scopes []entities.Scope `json:"scopes"`
+		Alias
+	}{
+		Scopes: r.Scopes(),
+		Alias: Alias(r.Role),
+	})
+}
+
+type rolesAdapter struct {
+    support.PaginatedQuery
+}
+
+func (r rolesAdapter) MarshalJSON() ([]byte, error) {
+    roles := r.Data.([]entities.Role)
+    data := make([]roleAdapter, len(roles))
+    for i, role := range roles {
+        data[i] = roleAdapter{role}
+    }
+    r.Data = data
+    
+    return json.Marshal(r.PaginatedQuery)
 }
