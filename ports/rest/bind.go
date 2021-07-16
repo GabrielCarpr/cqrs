@@ -49,7 +49,7 @@ func Bind(c *gin.Context, target interface{}) error {
 		Result:           target,
 		TagName:          "cqrs",
 		Squash:           true,
-		DecodeHook:       mapstructure.ComposeDecodeHookFunc(unmarshalDecodeHook),
+		DecodeHook:       unmarshalDecodeHook,
 	})
 	if err != nil {
 		return err

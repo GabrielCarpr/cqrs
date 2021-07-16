@@ -9,36 +9,12 @@ import (
     dcdfbaac "example/users/commands"
     efebecad "example/users/entities"
     ddfedaff "example/users/queries"
-    cabadefc "example/users/readmodels"
 
     "github.com/gin-gonic/gin"
 )
 
-func New(b *bus.Bus, secret string) *adapter.Server {
-    server := adapter.NewServer(b, secret)
-    server.Map("POST", "/rest/v1/auth/login", func (b *bus.Bus) gin.HandlerFunc {
-        return func(c *gin.Context) {
-            query := ddfedaff.Login{}
-            result := cabadefc.Authentication{}
-            if err := adapter.MustBind(c, &query); err != nil {
-                return
-            }
-
-            err := b.Query(c.Request.Context(), query, &result)
-            if err == nil {
-                c.JSON(http.StatusOK, result)
-                return
-            }
-            switch err := err.(type) {
-            case cqrsErrs.Error:
-                c.JSON(err.Code, err)
-                return
-            default:
-                c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
-                return
-            }
-        }
-    })
+func New(b *bus.Bus, config adapter.Config) *adapter.Server {
+    server := adapter.NewServer(b, config)
     server.Map("POST", "/rest/v1/auth/register", func (b *bus.Bus) gin.HandlerFunc {
         return func(c *gin.Context) {
             cmd := dcdfbaac.Register{}

@@ -15,7 +15,7 @@ func init() {
 func NewConfig() Config {
 	return Config{
 		AppName:     "{{ .Module }}",
-		Environment: requiredS("ENVIRONMENT"),
+		Environment: defaultS("ENVIRONMENT", "production"),
 		DBHost:      requiredS("DB_HOST"),
 		DBPort:      requiredS("DB_PORT"),
 		DBUser:      requiredS("DB_USER"),

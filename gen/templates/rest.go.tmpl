@@ -13,8 +13,8 @@ import (
     "github.com/gin-gonic/gin"
 )
 
-func New(b *bus.Bus, secret string) *adapter.Server {
-    server := adapter.NewServer(b, secret)
+func New(b *bus.Bus, config adapter.Config) *adapter.Server {
+    server := adapter.NewServer(b, config)
 
     {{- range $route := .Routes }}
     {{- if not (eq $route.Command "") }}

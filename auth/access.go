@@ -154,7 +154,7 @@ func scopeSatisfiesScope(requiredScope string, accessScope string) bool {
 
 // HashPassword generates a hash for a provided password
 func HashPassword(password string) string {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 13)
 	if err != nil {
 		panic(err)
 	}

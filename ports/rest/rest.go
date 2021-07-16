@@ -10,15 +10,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewServer(b *bus.Bus, secret string) *Server {
-	s := &Server{b, gin.Default(), secret}
+type Config struct {
+	Secret      string
+	URL         string
+	Development bool
+}
+
+func NewServer(b *bus.Bus, conf Config) *Server {
+	s := &Server{b, gin.Default(), conf}
 	return s
 }
 
 type Server struct {
 	bus    *bus.Bus
 	router *gin.Engine
-	secret string
+	Config Config
 }
 
 func (s *Server) Map(method string, route string, handler func(*bus.Bus) gin.HandlerFunc, middlewares ...gin.HandlerFunc) {
@@ -50,7 +56,7 @@ func (s *Server) Auth() gin.HandlerFunc {
 			return
 		}
 
-		credentials, err := auth.ReadToken(parts[1], s.secret)
+		credentials, err := auth.ReadToken(parts[1], s.Config.Secret)
 		if err != nil {
 			log.Error(c.Request.Context(), "JWT token invalid", log.F{"error": err.Error()})
 			c.AbortWithStatusJSON(401, gin.H{"message": "Unauthorized", "code": 401})
