@@ -39,20 +39,31 @@ func (p Ports) Run(ctx context.Context) error {
 	ctx, _ = signal.NotifyContext(ctx, os.Interrupt, os.Kill, syscall.SIGINT, syscall.SIGTERM)
 	g, ctx := errgroup.WithContext(ctx)
 
+	start := make(chan struct{})
 	for _, port := range p {
-		g.Go(func() error {
-			return port.Run(ctx)
-		})
+		port := port
+		go func() {
+			<-start
+			g.Go(func() (err error) {
+				defer func() {
+					if r := recover(); r != nil {
+						err = fmt.Errorf("panic: %v", r)
+					}
+				}()
+				return port.Run(ctx)
+			})
+		}()
 	}
+	close(start)
 
 	<-ctx.Done()
 	log.Info(ctx, "Quitting - waiting for all ports to exit", log.F{})
 
 	var err error
-	ended := make(chan struct{}, 1)
+	ended := make(chan struct{})
 	go func() {
 		err = g.Wait()
-		ended <- struct{}{}
+		close(ended)
 	}()
 
 	select {
