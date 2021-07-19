@@ -31,6 +31,7 @@ services:
       DB_NAME: "cqrs"
       DB_PASS: "cqrs"
       SECRET_KEY: "secret"
+      MIGRATIONS: "/src/_example/migrations"
       PORT: "80"
     command: ["bash", "-c", "cd _example; go run example"]
 

@@ -70,7 +70,6 @@ type App struct {
 }
 
 func (a *App) Handle() {
-
 	restServer := rest.Rest(a.Bus, config.Values)
 	p := ports.Ports{restServer}
 
