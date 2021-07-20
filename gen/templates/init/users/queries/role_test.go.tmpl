@@ -47,5 +47,5 @@ func (s TestRoleSuite) TestGetMissingRole() {
 	s.Error(err)
 	role := r
 	s.Empty(role.ID.String())
-	s.ErrorIs(errors.Error{}, err)
+	s.IsType(errors.Error{}, err)
 }

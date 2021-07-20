@@ -1,0 +1,49 @@
+---
+path: /rest/v1
+
+groups:
+- path: /auth
+  routes:
+  - path: /register
+    method: POST
+    command: example/users/commands.Register
+
+- middleware: ["Auth"]
+  groups:
+  - path: /users
+    routes:
+    - path: /:ID
+      method: GET
+      query:
+        question: example/users/queries.User
+        answer: example/users/entities.User
+    - path: /
+      method: GET
+      query:
+        question: example/users/queries.Users
+        answer: example/internal/support.PaginatedQuery
+    - path: /:ID
+      method: PUT
+      command: example/users/commands.UpdateUser
+  
+  - path: /roles
+    routes:
+    - path: /:ID
+      method: GET
+      query:
+        question: example/users/queries.Role
+        answer: example/users/entities.Role
+        adapter: roleAdapter
+    - path: /
+      method: GET
+      query:
+        question: example/users/queries.Roles
+        answer: example/internal/support.PaginatedQuery
+        adapter: rolesAdapter
+    - path: /:ID
+      method: PUT
+      command: example/users/commands.UpdateRole
+    - path: /
+      method: POST
+      command: example/users/commands.CreateRole
+

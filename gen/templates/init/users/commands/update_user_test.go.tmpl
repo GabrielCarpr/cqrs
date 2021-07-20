@@ -48,7 +48,7 @@ func TestUpdateShortPassword(t *testing.T) {
 	res, _ := handler.Execute(auth.TestCtx(u.ID.UUID, "self:write"), cmd)
 
 	assert.Error(t, res.Error)
-	assert.ErrorIs(t, errors.Error{}, res.Error)
+	assert.IsType(t, res.Error, errors.Error{})
 	assert.Contains(t, res.Error.Error(), "Password")
 }
 

@@ -95,17 +95,17 @@ func Register(email string, password string) (User, error) {
 
 // User is a user of the application
 type User struct {
-	ID           support.ID `json:"id"`
-	Name         string
-	Email        support.Email
+	ID           support.ID `json:"ID"`
+	Name         string `json:"name"`
+	Email        support.Email `json:"email"`
 	RoleIDs      []RoleID `json:"role_ids"`
 	Hash         string   `json:"-"`
-	Active       bool
+	Active       bool `json:"active"`
 	LastSignedIn *time.Time `json:"last_signed_in"`
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
 
-	bus.EventQueue
+	bus.EventQueue `json:"-"`
 }
 
 // ChangePassword sets the users password, while hashing it

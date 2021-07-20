@@ -63,12 +63,12 @@ func CreateRole(label string) Role {
 
 // Role is a user provided role in the access control system
 type Role struct {
-	ID    RoleID `json:"id"`
-	Label string
+	ID    RoleID `json:"ID"`
+	Label string `json:"label"`
 
 	scopes map[string]Scope
 
-	bus.EventQueue
+	bus.EventQueue `json:"-"`
 }
 
 // Scopes returns the role's scopes

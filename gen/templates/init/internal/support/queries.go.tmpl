@@ -15,14 +15,14 @@ const (
 )
 
 func NewPaginatedQuery(d interface{}, c int) PaginatedQuery {
-	return PaginatedQuery{Data: d, Metadata: struct{ Count int32 }{int32(c)}}
+	return PaginatedQuery{Data: d, Metadata: struct{ Count int32 `json:"count"` }{int32(c)}}
 }
 
 type PaginatedQuery struct {
-	Data     interface{}
+	Data     interface{} `json:"data"`
 	Metadata struct {
-		Count int32
-	}
+		Count int32 `json:"count"`
+	} `json:"metadata"`
 }
 
 type Order string

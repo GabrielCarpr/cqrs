@@ -16,7 +16,7 @@ import (
 type Users struct {
 	bus.QueryType
 
-	Paging support.Paging
+	support.Paging
 
 	IDs     *[]support.ID
 	RoleIDs *[]entities.RoleID

@@ -1,0 +1,49 @@
+---
+path: /rest/v1
+
+groups:
+- path: /auth
+  routes:
+  - path: /register
+    method: POST
+    command: {{ .Module }}/users/commands.Register
+
+- middleware: ["Auth"]
+  groups:
+  - path: /users
+    routes:
+    - path: /:ID
+      method: GET
+      query:
+        question: {{ .Module }}/users/queries.User
+        answer: {{ .Module }}/users/entities.User
+    - path: /
+      method: GET
+      query:
+        question: {{ .Module }}/users/queries.Users
+        answer: {{ .Module }}/internal/support.PaginatedQuery
+    - path: /:ID
+      method: PUT
+      command: {{ .Module }}/users/commands.UpdateUser
+  
+  - path: /roles
+    routes:
+    - path: /:ID
+      method: GET
+      query:
+        question: {{ .Module }}/users/queries.Role
+        answer: {{ .Module }}/users/entities.Role
+        adapter: roleAdapter
+    - path: /
+      method: GET
+      query:
+        question: {{ .Module }}/users/queries.Roles
+        answer: {{ .Module }}/internal/support.PaginatedQuery
+        adapter: rolesAdapter
+    - path: /:ID
+      method: PUT
+      command: {{ .Module }}/users/commands.UpdateRole
+    - path: /
+      method: POST
+      command: {{ .Module }}/users/commands.CreateRole
+

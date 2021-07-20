@@ -20,7 +20,7 @@ func TestLogin(t *testing.T) {
 }
 
 func (s LoginTest) TestLogin() {
-	query := queries.Login{Email: "gabriel.carpreau@gmail.com", Password: "password123"}
+	query := queries.Login{Email: "me@gabrielcarpreau.com", Password: "password123"}
 
 	var res readmodels.Authentication
 	err := s.Bus().Query(context.Background(), query, &res)

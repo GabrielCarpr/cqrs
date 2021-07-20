@@ -4,6 +4,10 @@ import (
 	"{{ .Module }}/internal/app"
 	"{{ .Module }}/internal/config"
 	"github.com/GabrielCarpr/cqrs/bus"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+
+	"fmt"
 
 	"github.com/golang-migrate/migrate/v4"
 	"context"
@@ -28,13 +32,22 @@ type Integration struct {
 
 func (i *Integration) SetupTest() {
 	config.Values = GetTestConfig()
-	i.bus = bus.Default(context.Background(), append(app.Modules, testModule(i.Doubles)))
 	i.migrate()
+	i.bus = bus.Default(context.Background(), append(app.Modules, testModule(i.Doubles)))
 }
 
 func (i *Integration) TearDownTest() {
-	i.bus.Close()
+	i.CloseBus()
 	i.Doubles = []bus.Def{}
+}
+
+func (i *Integration) CloseBus() {
+	defer func() {
+		if r := recover(); r != nil {
+			return
+		}
+	}()
+	i.bus.Close()
 }
 
 func (i *Integration) Bus() *bus.Bus {
@@ -46,16 +59,31 @@ func (i *Integration) Get(svc interface{}) interface{} {
 }
 
 func (i *Integration) migrate() {
-	migrator := i.bus.Get("migrator").(*migrate.Migrate)
-	err := migrator.Drop()
+	i.CloseBus()
+	migs := config.Values.Migrations
+	m, err := migrate.New(
+		fmt.Sprintf("file://%s", migs),
+		fmt.Sprintf(
+			"postgresql://%s:%s@%s:%s/%s?sslmode=disable",
+			config.Values.DBUser,
+			config.Values.DBPass,
+			config.Values.DBHost,
+			config.Values.DBPort,
+			config.Values.DBName,
+		),
+	)
 	if err != nil {
 		panic(err)
 	}
+	defer m.Close()
 
-	migrator = i.bus.Get("migrator").(*migrate.Migrate)
-	err = migrator.Up()
+	err = m.Drop()
 	if err != nil {
 		panic(err)
+	}
+	err = m.Up()
+	if err != nil {
+		//panic(err)
 	}
 }
 

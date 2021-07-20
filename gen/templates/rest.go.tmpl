@@ -1,0 +1,30 @@
+package rest
+
+import (
+    "github.com/GabrielCarpr/cqrs/bus"
+    adapter "github.com/GabrielCarpr/cqrs/ports/rest"
+    cqrsErrs "github.com/GabrielCarpr/cqrs/errors"
+    "net/http"
+
+    {{- range $pkg, $alias := .Imports }}
+    {{ $alias }} "{{ $pkg }}"
+    {{- end }}
+
+    "github.com/gin-gonic/gin"
+)
+
+func New(b *bus.Bus, config adapter.Config) *adapter.Server {
+    server := adapter.NewServer(b, config)
+    var mode string
+    if config.Development {
+        mode = gin.DebugMode
+    } else {
+        mode = gin.ReleaseMode
+    }
+    gin.SetMode(mode)
+    grp := server.Router.Group("")
+
+    {{ template "restGroup" . }}
+
+    return server
+}

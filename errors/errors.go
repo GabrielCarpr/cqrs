@@ -14,8 +14,8 @@ var (
 // message, and HTTP may show the message and the error code. Or, HTTP
 // may maintain a mapping from codes to HTTP statuses
 type Error struct {
-	Code    int
-	Message string
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
 func (e Error) Error() string {

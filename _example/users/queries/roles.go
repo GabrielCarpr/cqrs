@@ -7,6 +7,7 @@ import (
 	"example/users/db"
 	"example/users/entities"
 	"context"
+	"example/internal/support"
 )
 
 type Roles struct {
@@ -43,7 +44,7 @@ type RolesHandler struct {
 
 func (h RolesHandler) Execute(ctx context.Context, q bus.Query, r interface{}) error {
 	query := q.(Roles)
-	res := r.(*[]entities.Role)
+	res := r.(*support.PaginatedQuery)
 
 	if !util.Empty(query.IDs) {
 		return h.getByIds(*query.IDs, res)
@@ -52,18 +53,18 @@ func (h RolesHandler) Execute(ctx context.Context, q bus.Query, r interface{}) e
 	return h.getAll(res)
 }
 
-func (h RolesHandler) getAll(res *[]entities.Role) error {
+func (h RolesHandler) getAll(res *support.PaginatedQuery) error {
 	roles, err := h.roles.All()
 	switch true {
 	case err == nil:
-		*res = roles
+		*res = support.NewPaginatedQuery(roles, len(roles))
 		return nil
 	default:
 		return err
 	}
 }
 
-func (h RolesHandler) getByIds(ids []string, res *[]entities.Role) error {
+func (h RolesHandler) getByIds(ids []string, res *support.PaginatedQuery) error {
 	roleIDs := make([]entities.RoleID, len(ids))
 	for i, id := range ids {
 		roleIDs[i] = entities.NewRoleID(id)
@@ -71,7 +72,7 @@ func (h RolesHandler) getByIds(ids []string, res *[]entities.Role) error {
 	roles, err := h.roles.Find(roleIDs...)
 	switch true {
 	case err == nil:
-		*res = roles
+		*res = support.NewPaginatedQuery(roles, len(roles))
 		return nil
 	default:
 		return err

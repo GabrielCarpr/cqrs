@@ -19,6 +19,8 @@ services:
       - ./_example/migrations:/var/migrations
       - go-deps:/go/pkg
     working_dir: /src
+    ports:
+    - 8085:80
     depends_on: 
       - db
     environment:
@@ -29,6 +31,9 @@ services:
       DB_NAME: "cqrs"
       DB_PASS: "cqrs"
       SECRET_KEY: "secret"
+      MIGRATIONS: "/src/_example/migrations"
+      PORT: "80"
+    command: ["bash", "-c", "cd _example; go run example"]
 
 volumes:
   go-deps: {}
