@@ -40,7 +40,7 @@ func BuildRole(ID string, Label string) Role {
 		ID:         i,
 		Label:      Label,
 		scopes:     make(map[string]Scope),
-		EventQueue: bus.NewEventQueue(i),
+		EventBuffer: bus.NewEventBuffer(i),
 	}
 	return r
 }
@@ -55,9 +55,9 @@ func CreateRole(label string) Role {
 		ID:         id,
 		Label:      label,
 		scopes:     make(map[string]Scope),
-		EventQueue: bus.NewEventQueue(id),
+		EventBuffer: bus.NewEventBuffer(id),
 	}
-	r.Publish(&RoleCreated{Payload: r})
+	r.Buffer(true, &RoleCreated{Payload: r})
 	return r
 }
 
@@ -68,7 +68,7 @@ type Role struct {
 
 	scopes map[string]Scope
 
-	bus.EventQueue `json:"-"`
+	bus.EventBuffer `json:"version"`
 }
 
 // Scopes returns the role's scopes
@@ -95,7 +95,7 @@ func (r Role) ApplyScopes(scopes ...string) Role {
 	for _, scope := range scopes {
 		s := Scope{scope}
 		r.scopes[scope] = s
-		r.Publish(&RoleScopeApplied{Payload: s})
+		r.Buffer(true, &RoleScopeApplied{Payload: s})
 	}
 	return r
 }

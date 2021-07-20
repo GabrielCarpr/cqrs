@@ -13,7 +13,7 @@ func TestRole_Scopes(t *testing.T) {
 	assert.Contains(t, role.Scopes(), entities.Scope{"access:user"})
 	assert.Contains(t, role.Scopes(), entities.Scope{"payments:write"})
 	assert.NotContains(t, role.Scopes(), entities.Scope{"users:write"})
-	events := role.Release()
+	events := role.Commit()
 	assert.Len(t, events, 3)
 	created := events[0].(*entities.RoleCreated)
 	assert.Equal(t, "user", created.Owner)

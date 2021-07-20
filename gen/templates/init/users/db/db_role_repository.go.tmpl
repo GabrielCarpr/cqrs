@@ -14,6 +14,7 @@ func fromRole(role entities.Role) dbRole {
 		ID:     role.ID.String(),
 		Label:  role.Label,
 		Scopes: scopes,
+		Version: role.CurrentVersion(),
 	}
 }
 
@@ -31,6 +32,7 @@ func scopes(roles ...entities.Role) []dbScope {
 type dbRole struct {
 	ID    string `gorm:"primaryKey"`
 	Label string
+	Version int64
 
 	Scopes []dbScope `gorm:"many2many:role_scopes;joinForeignKey:role_id;joinReferences:scope_id"`
 }
@@ -47,6 +49,7 @@ func (r dbRole) Role() entities.Role {
 	for _, s := range r.Scopes {
 		role = role.ApplyScopes(s.Name)
 	}
+	role.ForceVersion(r.Version)
 	return role
 }
 
