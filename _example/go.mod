@@ -9,7 +9,7 @@ replace github.com/GabrielCarpr/cqrs/gen => ../gen
 require (
 	github.com/GabrielCarpr/cqrs v0.2.0
 	github.com/gin-gonic/gin v1.7.2
-	github.com/golang-migrate/migrate/v4 v4.14.1
+	github.com/golang-migrate/migrate/v4 v4.2.0
 	github.com/google/uuid v1.2.0
 	github.com/jackc/pgconn v1.8.1
 	github.com/jmoiron/sqlx v1.3.4

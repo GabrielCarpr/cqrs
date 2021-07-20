@@ -12,15 +12,15 @@ import (
 	"example/users"
 	"context"
 	"encoding/json"
-	"fmt"
+	//"fmt"
 	"github.com/google/uuid"
 	stdlog "log"
 	"os/signal"
 	"os"
 
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	//"github.com/golang-migrate/migrate/v4"
+	//_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	//_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jmoiron/sqlx"
 	"github.com/sarulabs/di/v2"
 	"gorm.io/driver/postgres"
@@ -94,6 +94,10 @@ var Main = bus.FuncModule{
 				Build: func(ctn di.Container) (interface{}, error) {
 					return sqlx.MustConnect("postgres", config.Values.DBDsn()), nil
 				},
+				Close: func(obj interface{}) error {
+					db := obj.(*sqlx.DB)
+					return db.Close()
+				},
 			},
 		
 			{
@@ -108,7 +112,7 @@ var Main = bus.FuncModule{
 				},
 			},
 		
-			{
+			/*{
 				Name: "migrator",
 				Build: func(ctn di.Container) (interface{}, error) {
 					migs := config.Values.Migrations
@@ -134,7 +138,7 @@ var Main = bus.FuncModule{
 					return err2
 				},
 				Unshared: true,
-			},
+			},*/
 		}
 	},
 }
