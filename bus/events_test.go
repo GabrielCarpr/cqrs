@@ -114,7 +114,11 @@ func TestApplyChange(t *testing.T) {
 	require.Equal(t, int64(0), entity.Version)
 	require.Equal(t, int64(1), entity.PendingVersion())
 
+	events := entity.Events()
 	entity.Commit()
+	require.Equal(t, "test.name.changed", events[0].Event())
+	require.Equal(t, int64(1), events[0].Versioned())
+	require.False(t, events[0].WasPublishedAt().IsZero())
 
 	require.Equal(t, int64(1), entity.CurrentVersion())
 }

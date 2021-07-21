@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/GabrielCarpr/cqrs/bus/message"
 )
@@ -16,6 +17,18 @@ type Event interface {
 	// OwnedBy tells the event which entity the event originated from
 	OwnedBy(fmt.Stringer)
 
+	// PublishedAt sets the time the event was published
+	PublishedAt(time.Time)
+
+	// WasPublishedAt returns the time the event was published
+	WasPublishedAt() time.Time
+
+	// IsVersion is the version of the event on the entity
+	IsVersion(int64)
+
+	// Versioned returns the version of the entity the event
+	Versioned() int64
+
 	// Event returns the events name. Must be implemented by all events
 	Event() string
 }
@@ -23,7 +36,11 @@ type Event interface {
 // EventType is a struct designed to be embedded within an event,
 // providing some basic behaviours
 type EventType struct {
-	Owner string
+	Owner string `json:"owner"`
+
+	At time.Time `json:"at"`
+
+	Version int64 `json:"version"`
 }
 
 // MessageType satisfies the message.Message interface, used for routing
@@ -34,6 +51,26 @@ func (e EventType) MessageType() message.Type {
 // OwnedBy is the owning entity of the event
 func (e *EventType) OwnedBy(id fmt.Stringer) {
 	e.Owner = id.String()
+}
+
+// PublishedAt implements Event interface PublishedAt
+func (e *EventType) PublishedAt(t time.Time) {
+	e.At = t
+}
+
+// WasPublishedAt implements Event interface WasPublishedAt
+func (e EventType) WasPublishedAt() time.Time {
+	return e.At
+}
+
+// IsVersion implements the Event interface IsVersion
+func (e *EventType) IsVersion(v int64) {
+	e.Version = v
+}
+
+// Versioned implements the Event interface Versioned
+func (e EventType) Versioned() int64 {
+	return e.Version
 }
 
 // EventHandler is a handler for one specific event.
@@ -82,6 +119,8 @@ func (e *EventBuffer) Buffer(isNew bool, events ...Event) {
 			continue
 		}
 		event.OwnedBy(e.owner)
+		event.IsVersion(e.Version + 1)
+		event.PublishedAt(time.Now())
 		e.events = append(e.events, event)
 	}
 }
