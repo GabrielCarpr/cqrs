@@ -2,6 +2,9 @@ package bus
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+
 	"github.com/GabrielCarpr/cqrs/bus/message"
 )
 
@@ -11,7 +14,7 @@ type Event interface {
 	message.Message
 
 	// OwnedBy tells the event which entity the event originated from
-	OwnedBy(interface{ String() string })
+	OwnedBy(fmt.Stringer)
 
 	// Event returns the events name. Must be implemented by all events
 	Event() string
@@ -29,7 +32,7 @@ func (e EventType) MessageType() message.Type {
 }
 
 // OwnedBy is the owning entity of the event
-func (e *EventType) OwnedBy(id interface{ String() string }) {
+func (e *EventType) OwnedBy(id fmt.Stringer) {
 	e.Owner = id.String()
 }
 
@@ -40,48 +43,93 @@ type EventHandler interface {
 	Async() bool
 }
 
-// NewEventQueue returns an owned event queue
-func NewEventQueue(owner interface{ String() string }) EventQueue {
-	return EventQueue{
-		owner: owner,
-	}
+// Versionable is an entity that can be versioned with events
+type Versionable interface {
+	CurrentVersion() int64
+	PendingVersion() int64
+	Commit() []message.Message
+	ApplyChange(bool, ...Event)
 }
 
 // Event Queue
 
-// EventQueue is embedded in entities to buffer events before
-// being released to infrastructure
-type EventQueue struct {
-	owner     interface{ String() string }
-	events    []Event
-	GobEncode bool // Unused, purely to make Gob encode the eventqueue and not fail.
+// NewEventBuffer returns an owned event queue
+func NewEventBuffer(owner fmt.Stringer) EventBuffer {
+	return EventBuffer{
+		owner: owner,
+	}
 }
 
-// Publish adds events to the buffer queue,
+// EventBuffer is embedded in entities to buffer events before
+// being released to infrastructure
+type EventBuffer struct {
+	owner   interface{ String() string }
+	events  []Event
+	Version int64 `json:"version"`
+}
+
+// JSONMarshal implements encoding/json.Marshaler
+func (e EventBuffer) JSONMarshal() ([]byte, error) {
+	return json.Marshal(e.Version)
+}
+
+// Buffer adds events to the buffer queue,
 // and sets their owner simutaneously
-func (e *EventQueue) Publish(events ...Event) {
+func (e *EventBuffer) Buffer(isNew bool, events ...Event) {
 	for _, event := range events {
+		if !isNew {
+			e.Version++
+			continue
+		}
 		event.OwnedBy(e.owner)
 		e.events = append(e.events, event)
 	}
 }
 
-// Release empties the event queue, returning
-func (e *EventQueue) Release() []message.Message {
+// Messages returns the event queue as messages
+func (e *EventBuffer) Messages() []message.Message {
 	output := make([]message.Message, len(e.events))
 	for i, event := range e.events {
 		output[i] = event
 	}
-	e.events = make([]Event, 0)
 	return output
 }
 
-// ReleaseEvents empties the event queue, returning events
-func (e *EventQueue) ReleaseEvents() []Event {
-	output := make([]Event, len(e.events))
-	for i, event := range e.events {
-		output[i] = event
-	}
+// Events empties the event queue, returning events
+func (e *EventBuffer) Events() []Event {
+	return e.events
+}
+
+// Flush clears the event queue, without committing
+func (e *EventBuffer) Flush() {
 	e.events = make([]Event, 0)
+}
+
+// CurrentVersion returns the entity's current version,
+// the same as the attribute. Required for the interface
+func (e *EventBuffer) CurrentVersion() int64 {
+	return e.Version
+}
+
+// PendingVersion returns the version that the
+// entity will get if committed
+func (e *EventBuffer) PendingVersion() int64 {
+	return e.Version + int64(len(e.events))
+}
+
+// Commit releases pending events, and commits the new version to
+// the entity. It is assumed that after calling commit, the entity
+// with be persisted (with new version), and events published
+func (e *EventBuffer) Commit() []message.Message {
+	output := e.Messages()
+	e.Version = e.PendingVersion()
+	e.Flush()
 	return output
+}
+
+// ForceVersion forces the entity version, useful when not
+// doing event sourcing, so the repository can set the stored
+// entity version
+func (e *EventBuffer) ForceVersion(v int64) {
+	e.Version = v
 }

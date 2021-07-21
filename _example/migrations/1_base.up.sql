@@ -6,12 +6,14 @@ CREATE TABLE users(
     active BOOLEAN NOT NULL DEFAULT false,
     last_signed_in TIMESTAMP DEFAULT null,
     created_at TIMESTAMP NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP NOT NULL DEFAULT now()
+    updated_at TIMESTAMP NOT NULL DEFAULT now(),
+    version INT NOT NULL
 );
 
 CREATE TABLE roles(
     ID VARCHAR(128) NOT NULL PRIMARY KEY,
-    label varchar(128) NOT NULL
+    label varchar(128) NOT NULL,
+    version INT NOT NULL
 );
 
 CREATE TABLE scopes(

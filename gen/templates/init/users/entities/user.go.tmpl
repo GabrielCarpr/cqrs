@@ -87,9 +87,9 @@ func Register(email string, password string) (User, error) {
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 		Active:     true,
-		EventQueue: bus.NewEventQueue(id),
+		EventBuffer: bus.NewEventBuffer(id),
 	}
-	u.Publish(&UserCreated{Payload: u})
+	u.Buffer(true, &UserCreated{Payload: u})
 	return u.ChangePassword(password)
 }
 
@@ -105,7 +105,7 @@ type User struct {
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
 
-	bus.EventQueue `json:"-"`
+	bus.EventBuffer `json:"version"`
 }
 
 // ChangePassword sets the users password, while hashing it
@@ -137,13 +137,13 @@ func (u User) Grant(role Role) User {
 		}
 	}
 	u.RoleIDs = append(u.RoleIDs, role.ID)
-	u.Publish(&UserGrantedRole{Payload: role})
+	u.Buffer(true, &UserGrantedRole{Payload: role})
 	return u
 }
 
 func (u User) Revoke(roles ...Role) User {
 	if len(roles) == 0 {
-		u.Publish(&UserRevokedAllRoles{Payload: u.RoleIDs})
+		u.Buffer(true, &UserRevokedAllRoles{Payload: u.RoleIDs})
 		u.RoleIDs = []RoleID{}
 		return u
 	}
@@ -152,7 +152,7 @@ func (u User) Revoke(roles ...Role) User {
 	for _, roleID := range u.RoleIDs {
 		for _, role := range roles {
 			if role.ID.Equals(roleID) {
-				u.Publish(&UserRevokedRole{Payload: role})
+				u.Buffer(true, &UserRevokedRole{Payload: role})
 				break
 			}
 			new = append(new, roleID)
@@ -187,7 +187,7 @@ func AllScopes(u User, roles ...Role) []Scope {
 // ChangeName changes the user's stored name
 func (u User) ChangeName(name string) User {
 	u.Name = name
-	u.Publish(&UserDetailsChanged{Payload: u})
+	u.Buffer(true, &UserDetailsChanged{Payload: u})
 	return u
 }
 
@@ -198,6 +198,6 @@ func (u User) ChangeEmail(email string) (User, error) {
 		return u, err
 	}
 	u.Email = e
-	u.Publish(&UserDetailsChanged{Payload: u})
+	u.Buffer(true, &UserDetailsChanged{Payload: u})
 	return u, nil
 }

@@ -13,7 +13,7 @@ func TestRegister(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, user.Email.String(), "gabriel.carpreau@gmail.com")
-	events := user.Release()
+	events := user.Commit()
 	assert.Len(t, events, 1)
 	assert.IsType(t, &entities.UserCreated{}, events[0])
 	assert.Equal(t, user.ID.String(), events[0].(*entities.UserCreated).Owner)
@@ -64,14 +64,14 @@ func TestGetUserScopes(t *testing.T) {
 
 func TestGrantRole(t *testing.T) {
 	u, _ := entities.Register("gabriel@gmail.com", "password123")
-	u.Release()
+	u.Commit()
 	r := entities.CreateRole("Ambassador")
 
 	u = u.Grant(r)
 
 	assert.Len(t, u.RoleIDs, 1)
 	assert.Contains(t, u.RoleIDs, entities.NewRoleID("ambassador"))
-	events := u.Release()
+	events := u.Commit()
 	assert.Len(t, events, 1)
 	assert.IsType(t, &entities.UserGrantedRole{}, events[0])
 }
@@ -95,12 +95,12 @@ func TestRevokeAll(t *testing.T) {
 	admin := entities.CreateRole("Admin")
 	u = u.Grant(r).Grant(admin)
 	assert.Len(t, u.RoleIDs, 2)
-	u.Release()
+	u.Commit()
 
 	u = u.Revoke()
 
 	assert.Len(t, u.RoleIDs, 0)
-	events := u.Release()
+	events := u.Commit()
 	assert.Len(t, events, 1)
 	assert.IsType(t, &entities.UserRevokedAllRoles{}, events[0])
 	event := events[0].(*entities.UserRevokedAllRoles)
@@ -113,13 +113,13 @@ func TestRevokeOne(t *testing.T) {
 	admin := entities.CreateRole("Admin")
 	u = u.Grant(admin).Grant(r)
 	assert.Len(t, u.RoleIDs, 2)
-	u.Release()
+	u.Commit()
 
 	u = u.Revoke(admin)
 
 	assert.Len(t, u.RoleIDs, 1)
 	assert.True(t, u.RoleIDs[0].Equals(r.ID))
-	events := u.Release()
+	events := u.Commit()
 	assert.Len(t, events, 1)
 	assert.IsType(t, &entities.UserRevokedRole{}, events[0])
 }

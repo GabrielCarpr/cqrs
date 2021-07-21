@@ -35,6 +35,7 @@ func fromUser(u entities.User) dbUser {
 		LastSignedIn: last,
 		CreatedAt:    u.CreatedAt,
 		UpdatedAt:    u.UpdatedAt,
+		Version: u.CurrentVersion(),
 	}
 }
 
@@ -57,6 +58,7 @@ type dbUser struct {
 	LastSignedIn sql.NullTime
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	Version		 int64
 }
 
 func (d dbUser) TableName() string {
@@ -76,7 +78,7 @@ func (d dbUser) User() entities.User {
 		time = nil
 	}
 
-	return entities.User{
+	u := entities.User{
 		ID:           d.ID,
 		Name:         d.Name,
 		Email:        email,
@@ -86,8 +88,10 @@ func (d dbUser) User() entities.User {
 		LastSignedIn: time,
 		CreatedAt:    d.CreatedAt,
 		UpdatedAt:    d.UpdatedAt,
-		EventQueue:   bus.NewEventQueue(d.ID),
+		EventBuffer:   bus.NewEventBuffer(d.ID),
 	}
+	u.ForceVersion(d.Version)
+	return u
 }
 
 func NewDBUserRepository(db *gorm.DB) *DBUserRepository {
