@@ -14,8 +14,17 @@ import (
 type Event interface {
 	message.Message
 
+	// Owned is the ID of the entity that owns/produced the event
+	Owned() fmt.Stringer
+
 	// OwnedBy tells the event which entity the event originated from
 	OwnedBy(fmt.Stringer)
+
+	// ForAggregate is the type of entity that owns/produces the event
+	ForAggregate(string)
+
+	// FromAggregate is the type of entity that produced the event
+	FromAggregate() string
 
 	// PublishedAt sets the time the event was published
 	PublishedAt(time.Time)
@@ -36,11 +45,13 @@ type Event interface {
 // EventType is a struct designed to be embedded within an event,
 // providing some basic behaviours
 type EventType struct {
-	Owner string `json:"owner"`
+	Owner fmt.Stringer `json:"owner"`
 
 	At time.Time `json:"at"`
 
 	Version int64 `json:"version"`
+
+	Aggregate string `json:"aggregate"`
 }
 
 // MessageType satisfies the message.Message interface, used for routing
@@ -50,7 +61,12 @@ func (e EventType) MessageType() message.Type {
 
 // OwnedBy is the owning entity of the event
 func (e *EventType) OwnedBy(id fmt.Stringer) {
-	e.Owner = id.String()
+	e.Owner = id
+}
+
+// Owned implements the Event interface Owned
+func (e EventType) Owned() fmt.Stringer {
+	return e.Owner
 }
 
 // PublishedAt implements Event interface PublishedAt
@@ -73,6 +89,16 @@ func (e EventType) Versioned() int64 {
 	return e.Version
 }
 
+// ForAggregate implements the Event interface ForAggregate
+func (e *EventType) ForAggregate(t string) {
+	e.Aggregate = t
+}
+
+// FromAggregate implements the EventInterface FromAggregate
+func (e EventType) FromAggregate() string {
+	return e.Aggregate
+}
+
 // EventHandler is a handler for one specific event.
 // Each event may have multiple, or 0, EventHandlers.
 type EventHandler interface {
@@ -91,18 +117,20 @@ type Versionable interface {
 // Event Queue
 
 // NewEventBuffer returns an owned event queue
-func NewEventBuffer(owner fmt.Stringer) EventBuffer {
+func NewEventBuffer(owner fmt.Stringer, t string) EventBuffer {
 	return EventBuffer{
 		owner: owner,
+		Type:  t,
 	}
 }
 
 // EventBuffer is embedded in entities to buffer events before
 // being released to infrastructure
 type EventBuffer struct {
-	owner   interface{ String() string }
+	owner   fmt.Stringer
 	events  []Event
 	Version int64 `json:"version"`
+	Type    string
 }
 
 // JSONMarshal implements encoding/json.Marshaler
@@ -121,6 +149,7 @@ func (e *EventBuffer) Buffer(isNew bool, events ...Event) {
 		event.OwnedBy(e.owner)
 		event.IsVersion(e.Version + 1)
 		event.PublishedAt(time.Now())
+		event.ForAggregate(e.Type)
 		e.events = append(e.events, event)
 	}
 }
