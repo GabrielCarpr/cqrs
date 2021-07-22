@@ -147,7 +147,7 @@ func (e *EventBuffer) Buffer(isNew bool, events ...Event) {
 			continue
 		}
 		event.OwnedBy(e.owner)
-		event.IsVersion(e.Version + 1)
+		event.IsVersion(e.PendingVersion() + 1)
 		event.PublishedAt(time.Now())
 		event.ForAggregate(e.Type)
 		e.events = append(e.events, event)
@@ -188,8 +188,8 @@ func (e *EventBuffer) PendingVersion() int64 {
 // Commit releases pending events, and commits the new version to
 // the entity. It is assumed that after calling commit, the entity
 // with be persisted (with new version), and events published
-func (e *EventBuffer) Commit() []message.Message {
-	output := e.Messages()
+func (e *EventBuffer) Commit() []Event {
+	output := e.Events()
 	e.Version = e.PendingVersion()
 	e.Flush()
 	return output

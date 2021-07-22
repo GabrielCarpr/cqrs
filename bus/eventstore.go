@@ -6,8 +6,6 @@ import (
 
 type ExpectedVersion int64
 
-const NoExpectedVersion ExpectedVersion = -1
-
 type Stream = chan<- Event
 
 type EventStore interface {
@@ -17,7 +15,7 @@ type EventStore interface {
 }
 
 type Appendable interface {
-	Append(context.Context, ExpectedVersion, ...Event)
+	Append(context.Context, ExpectedVersion, ...Event) error
 }
 
 type Streamable interface {
@@ -25,7 +23,7 @@ type Streamable interface {
 }
 
 type Subscribable interface {
-	Subscribe(context.Context, Stream) error
+	Subscribe(context.Context, Select, func(Event) error) error
 }
 
 type Select struct {
