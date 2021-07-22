@@ -215,7 +215,7 @@ func (s EventStoreBlackboxTest) TestSubscribesAll() {
 	}
 
 	var result []bus.Event
-	err := s.store.Subscribe(ctx, bus.Select{}, func(e bus.Event) error {
+	err := s.store.Subscribe(ctx, func(e bus.Event) error {
 		result = append(result, e)
 		return nil
 	})
@@ -231,7 +231,7 @@ func (s EventStoreBlackboxTest) TestNoEventsDoesntCallBack() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*20)
 	defer cancel()
 
-	err := s.store.Subscribe(ctx, bus.Select{}, func(e bus.Event) error {
+	err := s.store.Subscribe(ctx, func(e bus.Event) error {
 		s.FailNow("Called back")
 		cancel()
 		return nil
@@ -257,7 +257,7 @@ func (s EventStoreBlackboxTest) TestSubscribesConcurrentlyInOrder() {
 	for i := 0; i < 25; i++ {
 		group.Go(func() error {
 			<-start
-			return s.store.Subscribe(ctx, bus.Select{}, func(e bus.Event) error {
+			return s.store.Subscribe(ctx, func(e bus.Event) error {
 				results <- e
 				return nil
 			})
@@ -287,38 +287,3 @@ func (s EventStoreBlackboxTest) TestSubscribesConcurrentlyInOrder() {
 		version++
 	}
 }
-
-/*func (s EventStoreBlackboxTest) TestSubscribesToStream() {
-	e := &TestEvent{Name: "Gabriel", Age: 27}
-	s.buffer.Buffer(true, e)
-	evs := s.buffer.Events()
-	err := s.store.Append(
-		context.Background(),
-		bus.ExpectedVersion(s.buffer.CurrentVersion()),
-		evs...,
-	)
-	s.NoError(err)
-
-	e2 := &TestEvent{Name: "Gabriel", Age: 24}
-	s.otherBuffer.Buffer(true, e2)
-	evs2 := s.otherBuffer.Events()
-	err = s.store.Append(
-		context.Background(),
-		bus.ExpectedVersion(s.otherBuffer.CurrentVersion()),
-		evs2...,
-	)
-	s.NoError(err)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*50)
-	defer cancel()
-
-	err = s.store.Subscribe(
-		ctx,
-		bus.Select{StreamID: bus.StreamID{Type: "testEntity", ID: s.entity.String()}},
-		func(e bus.Event) error {
-			s.Require().Equal(27, e.(*TestEvent).Age)
-			return nil
-		},
-	)
-	s.Require().NoError(err)
-}*/

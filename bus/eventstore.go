@@ -23,7 +23,7 @@ type Streamable interface {
 }
 
 type Subscribable interface {
-	Subscribe(context.Context, Select, func(Event) error) error
+	Subscribe(context.Context, func(Event) error) error
 }
 
 type Select struct {

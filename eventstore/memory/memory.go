@@ -55,6 +55,7 @@ func (s *MemoryEventStore) lastEventFor(id bus.StreamID) (bus.Event, bool) {
 }
 
 func (s *MemoryEventStore) Stream(ctx context.Context, stream bus.Stream, q bus.Select) error {
+	defer close(stream)
 	for _, event := range s.events {
 		if q.Type != "" && event.FromAggregate() != q.Type {
 			continue
@@ -68,11 +69,10 @@ func (s *MemoryEventStore) Stream(ctx context.Context, stream bus.Stream, q bus.
 		stream <- event
 	}
 
-	close(stream)
 	return nil
 }
 
-func (s *MemoryEventStore) Subscribe(ctx context.Context, q bus.Select, subscription func(bus.Event) error) error {
+func (s *MemoryEventStore) Subscribe(ctx context.Context, subscription func(bus.Event) error) error {
 	errors := 0
 	for {
 		select {
