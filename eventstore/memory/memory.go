@@ -18,29 +18,21 @@ type MemoryEventStore struct {
 }
 
 func (s *MemoryEventStore) Append(ctx context.Context, v bus.ExpectedVersion, events ...bus.Event) error {
-	sample := events[0]
-	for _, event := range events {
-		if event.FromAggregate() != sample.FromAggregate() {
-			return eventstore.ErrConsistencyViolation
-		}
-		if event.Owned() != sample.Owned() {
-			return eventstore.ErrConsistencyViolation
-		}
+	if err := eventstore.CheckEventsConsistent(events...); err != nil {
+		return err
 	}
-
-	last, ok := s.lastEventFor(bus.StreamID{Type: events[0].FromAggregate(), ID: events[0].Owned().String()})
-	if ok && last.Versioned() != int64(v) {
-		return eventstore.ErrConcurrencyViolation
+	last := s.lastEventFor(bus.StreamID{Type: events[0].FromAggregate(), ID: events[0].Owned().String()})
+	if err := eventstore.CheckExpectedVersion(last, v); err != nil {
+		return err
 	}
-	if !ok && v != bus.ExpectedVersion(0) {
-		return eventstore.ErrConcurrencyViolation
-	}
+	s.mx.Lock()
+	defer s.mx.Unlock()
 
 	s.events = append(s.events, events...)
 	return nil
 }
 
-func (s *MemoryEventStore) lastEventFor(id bus.StreamID) (bus.Event, bool) {
+func (s *MemoryEventStore) lastEventFor(id bus.StreamID) bus.Event {
 	for i := len(s.events) - 1; i >= 0; i-- {
 		event := s.events[i]
 		if id.Type != "" && event.FromAggregate() != id.Type {
@@ -49,9 +41,9 @@ func (s *MemoryEventStore) lastEventFor(id bus.StreamID) (bus.Event, bool) {
 		if id.ID != "" && event.Owned().String() != id.ID {
 			continue
 		}
-		return event, true
+		return event
 	}
-	return nil, false
+	return nil
 }
 
 func (s *MemoryEventStore) Stream(ctx context.Context, stream bus.Stream, q bus.Select) error {
