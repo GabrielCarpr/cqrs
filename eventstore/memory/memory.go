@@ -21,7 +21,7 @@ func (s *MemoryEventStore) Append(ctx context.Context, v bus.ExpectedVersion, ev
 	if err := eventstore.CheckEventsConsistent(events...); err != nil {
 		return err
 	}
-	last := s.lastEventFor(bus.StreamID{Type: events[0].FromAggregate(), ID: events[0].Owned().String()})
+	last := s.lastEventFor(bus.StreamID{Type: events[0].FromAggregate(), ID: events[0].Owned()})
 	if err := eventstore.CheckExpectedVersion(last, v); err != nil {
 		return err
 	}
@@ -38,7 +38,7 @@ func (s *MemoryEventStore) lastEventFor(id bus.StreamID) bus.Event {
 		if id.Type != "" && event.FromAggregate() != id.Type {
 			continue
 		}
-		if id.ID != "" && event.Owned().String() != id.ID {
+		if id.ID != "" && event.Owned() != id.ID {
 			continue
 		}
 		return event
@@ -52,7 +52,7 @@ func (s *MemoryEventStore) Stream(ctx context.Context, stream bus.Stream, q bus.
 		if q.Type != "" && event.FromAggregate() != q.Type {
 			continue
 		}
-		if q.ID != "" && event.Owned().String() != q.ID {
+		if q.ID != "" && event.Owned() != q.ID {
 			continue
 		}
 		if event.Versioned() < q.From {

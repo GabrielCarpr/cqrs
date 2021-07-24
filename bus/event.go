@@ -23,10 +23,10 @@ type Event interface {
 	message.Message
 
 	// Owned is the ID of the entity that owns/produced the event
-	Owned() fmt.Stringer
+	Owned() string
 
 	// OwnedBy tells the event which entity the event originated from
-	OwnedBy(fmt.Stringer)
+	OwnedBy(string)
 
 	// ForAggregate is the type of entity that owns/produces the event
 	ForAggregate(string)
@@ -46,6 +46,10 @@ type Event interface {
 	// Versioned returns the version of the entity the event
 	Versioned() int64
 
+	WithMetadata(Metadata)
+
+	HasMetadata() Metadata
+
 	// Event returns the events name. Must be implemented by all events
 	Event() string
 }
@@ -53,7 +57,7 @@ type Event interface {
 // EventType is a struct designed to be embedded within an event,
 // providing some basic behaviours
 type EventType struct {
-	Owner fmt.Stringer `json:"owner"`
+	Owner string `json:"owner"`
 
 	At time.Time `json:"at"`
 
@@ -69,13 +73,21 @@ func (e EventType) MessageType() message.Type {
 	return message.Event
 }
 
+func (e *EventType) WithMetadata(m Metadata) {
+	e.Metadata = m
+}
+
+func (e *EventType) HasMetadata() Metadata {
+	return e.Metadata
+}
+
 // OwnedBy is the owning entity of the event
-func (e *EventType) OwnedBy(id fmt.Stringer) {
+func (e *EventType) OwnedBy(id string) {
 	e.Owner = id
 }
 
 // Owned implements the Event interface Owned
-func (e EventType) Owned() fmt.Stringer {
+func (e EventType) Owned() string {
 	return e.Owner
 }
 
@@ -156,10 +168,11 @@ func (e *EventBuffer) Buffer(isNew bool, events ...Event) {
 			e.Version++
 			continue
 		}
-		event.OwnedBy(e.owner)
+		event.OwnedBy(e.owner.String())
 		event.IsVersion(e.PendingVersion() + 1)
 		event.PublishedAt(time.Now())
 		event.ForAggregate(e.Type)
+		event.WithMetadata(make(Metadata))
 		e.events = append(e.events, event)
 	}
 }
