@@ -94,3 +94,7 @@ func (s *MemoryEventStore) Subscribe(ctx context.Context, subscription func(bus.
 		}
 	}
 }
+
+func (s *MemoryEventStore) Close() error {
+	return nil
+}

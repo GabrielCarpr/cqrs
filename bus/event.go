@@ -2,12 +2,20 @@ package bus
 
 import (
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/GabrielCarpr/cqrs/bus/message"
+	"github.com/google/uuid"
 )
+
+func init() {
+	gob.Register(uuid.New())
+}
+
+type Metadata map[string]string
 
 // Event is a routable event indicating something has happened.
 // Events are fanned out to both sync and async handlers
@@ -52,6 +60,8 @@ type EventType struct {
 	Version int64 `json:"version"`
 
 	Aggregate string `json:"aggregate"`
+
+	Metadata Metadata `json:"metadata"`
 }
 
 // MessageType satisfies the message.Message interface, used for routing

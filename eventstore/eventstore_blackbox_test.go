@@ -1,3 +1,5 @@
+// +build !unit
+
 package eventstore_test
 
 import (
@@ -8,6 +10,7 @@ import (
 	"github.com/GabrielCarpr/cqrs/bus"
 	"github.com/GabrielCarpr/cqrs/eventstore"
 	"github.com/GabrielCarpr/cqrs/eventstore/memory"
+	"github.com/GabrielCarpr/cqrs/eventstore/postgres"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/sync/errgroup"
@@ -35,6 +38,25 @@ func TestMemoryEventStore(t *testing.T) {
 	suite.Run(t, s)
 }
 
+func TestPostgresEventStore(t *testing.T) {
+	c := postgres.Config{
+		DBName: "cqrs",
+		DBPass: "cqrs",
+		DBHost: "db",
+		DBUser: "cqrs",
+	}
+	s := &EventStoreBlackboxTest{
+		factory: func() bus.EventStore {
+			return postgres.New(c)
+		},
+	}
+	s.setupHook = func() error {
+		postgres.ResetSQLDB(c.DBDsn())
+		return nil
+	}
+	suite.Run(t, s)
+}
+
 /**
 Test Suite
 */
@@ -42,7 +64,8 @@ Test Suite
 type EventStoreBlackboxTest struct {
 	suite.Suite
 
-	factory func() bus.EventStore
+	factory   func() bus.EventStore
+	setupHook func() error
 
 	entity      uuid.UUID
 	buffer      bus.EventBuffer
@@ -55,6 +78,17 @@ func (s *EventStoreBlackboxTest) SetupTest() {
 	s.entity = uuid.New()
 	s.buffer = Buffer(s.entity)
 	s.otherBuffer = Buffer(uuid.New())
+
+	if s.setupHook != nil {
+		err := s.setupHook()
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+func (s *EventStoreBlackboxTest) TearDownTest() {
+	s.store.Close()
 }
 
 func (s EventStoreBlackboxTest) TestAppendsEventsAndStreams() {
@@ -85,13 +119,21 @@ func (s EventStoreBlackboxTest) TestAppendsEventsAndStreams() {
 	stream := make(chan bus.Event)
 	results := make([]bus.Event, 0)
 
-	group, ctx := errgroup.WithContext(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*20)
+	defer cancel()
+	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error {
 		return s.store.Stream(ctx, stream, query)
 	})
 
-	for ev := range stream {
-		results = append(results, ev)
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			break loop
+		case ev := <-stream:
+			results = append(results, ev)
+		}
 	}
 
 	err = group.Wait()

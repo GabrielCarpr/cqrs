@@ -12,6 +12,8 @@ type EventStore interface {
 	Appendable
 	Streamable
 	Subscribable
+
+	Close() error
 }
 
 type Appendable interface {
