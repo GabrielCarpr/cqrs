@@ -23,16 +23,11 @@ type SerialType int
 
 type SerializedContext map[string]string
 
-type contextRegistration struct {
-	Key     fmt.Stringer
-	Convert func(json []byte) interface{}
-}
-
-var contextMap map[string]contextRegistration
+var contextMap map[fmt.Stringer]reflect.Type
 var messageMap map[string]reflect.Type
 
 func init() {
-	contextMap = make(map[string]contextRegistration)
+	contextMap = make(map[fmt.Stringer]reflect.Type)
 	messageMap = make(map[string]reflect.Type)
 }
 
@@ -51,21 +46,21 @@ func RegisterMessage(msg message.Message) {
 	messageMap[msgKey(msg)] = reflect.TypeOf(msg)
 }
 
-func RegisterContextKey(key fmt.Stringer, fn func([]byte) interface{}) {
-	contextMap[key.String()] = contextRegistration{Key: key, Convert: fn}
+func RegisterContextKey(key fmt.Stringer, val interface{}) {
+	contextMap[key] = reflect.TypeOf(val)
 }
 
 func SerializeContext(ctx context.Context) SerializedContext {
-	result := make(map[string]string)
+	result := make(SerializedContext)
 
-	for name, reg := range contextMap {
-		val := ctx.Value(reg.Key)
+	for name := range contextMap {
+		val := ctx.Value(name)
 		if val == nil {
 			continue
 		}
 		str, ok := val.(string)
 		if ok {
-			result[name] = str
+			result[name.String()] = str
 			continue
 		}
 		bytes, err := json.Marshal(val)
@@ -73,20 +68,31 @@ func SerializeContext(ctx context.Context) SerializedContext {
 			log.Printf("Error serialising context value [%s]: %s", name, err)
 			continue
 		}
-		result[name] = string(bytes)
+		result[name.String()] = string(bytes)
 	}
 
 	return result
 }
 
 func DeserializeContext(ctx context.Context, data SerializedContext) context.Context {
-	for name, reg := range contextMap {
-		val, ok := data[name]
+	for name, t := range contextMap {
+		val, ok := data[name.String()]
 		if !ok {
 			continue
 		}
 
-		ctx = context.WithValue(ctx, reg.Key, reg.Convert([]byte(val)))
+		if !json.Valid([]byte(val)) {
+			ctx = context.WithValue(ctx, name, val)
+			continue
+		}
+
+		target := reflect.New(t).Interface()
+		err := json.Unmarshal([]byte(val), target)
+		if err != nil {
+			log.Printf("bus.DeserializeContext: %v", err)
+		}
+
+		ctx = context.WithValue(ctx, name, reflect.ValueOf(target).Elem().Interface())
 	}
 
 	return ctx

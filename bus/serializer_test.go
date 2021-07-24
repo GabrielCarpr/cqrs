@@ -51,19 +51,9 @@ type SerializerSuite struct {
 }
 
 func (s *SerializerSuite) SetupTest() {
-	bus.RegisterContextKey(testKey, func(j []byte) interface{} {
-		var v testVal
-		json.Unmarshal(j, &v)
-		return v
-	})
-	bus.RegisterContextKey(stringKey, func(j []byte) interface{} {
-		return string(j)
-	})
-	bus.RegisterContextKey(mapKey, func(j []byte) interface{} {
-		var m map[string]string
-		json.Unmarshal(j, &m)
-		return m
-	})
+	bus.RegisterContextKey(testKey, testVal{})
+	bus.RegisterContextKey(mapKey, map[string]string{})
+	bus.RegisterContextKey(stringKey, "")
 
 	bus.RegisterMessage(&testEventSerial{})
 	bus.RegisterMessage(testCmd{})
