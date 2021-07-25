@@ -187,8 +187,8 @@ func (s *SerializerSuite) TestSerializeCommandAsJson() {
 func (s *SerializerSuite) TestSerializeEventAsJson() {
 	id := uuid.New()
 	buffer := bus.NewEventBuffer(id, "testEvent")
-	buffer.Buffer(context.Background(), true, &testEventSerial{Name: "Lol"})
-	event := buffer.Events()[0]
+	buffer.Buffer(true, &testEventSerial{Name: "Lol"})
+	event := buffer.Events(context.Background())[0]
 
 	data, err := bus.SerializeMessage(event, bus.Json)
 	s.Require().NoError(err)

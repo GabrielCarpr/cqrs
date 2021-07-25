@@ -87,7 +87,7 @@ func Register(email string, password string) (User, error) {
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 		Active:     true,
-		EventBuffer: bus.NewEventBuffer(id),
+		EventBuffer: bus.NewEventBuffer(id, "User"),
 	}
 	u.Buffer(true, &UserCreated{Payload: u})
 	return u.ChangePassword(password)

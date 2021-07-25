@@ -11,7 +11,6 @@ import (
 	"example/rest"
 	"example/users"
 	"context"
-	"encoding/json"
 	//"fmt"
 	"github.com/google/uuid"
 	stdlog "log"
@@ -51,14 +50,8 @@ func Make(ctx context.Context) *App {
 		errors.CommandErrorMiddleware,
 		errors.QueryErrorMiddleware,
 	)
-	b.RegisterContextKey(auth.AuthCtxKey, func(j []byte) interface{} {
-		var v auth.Credentials
-		json.Unmarshal(j, &v)
-		return v
-	})
-	b.RegisterContextKey(log.CtxIDKey, func(j []byte) interface{} {
-		return uuid.MustParse(string(j))
-	})
+	bus.RegisterContextKey(auth.AuthCtxKey, auth.Credentials{})
+	bus.RegisterContextKey(log.CtxIDKey, uuid.New())
 
 	app := App{Bus: b, ctx: ctx}
 	return &app

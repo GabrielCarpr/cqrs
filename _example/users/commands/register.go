@@ -94,7 +94,8 @@ func (h RegisterHandler) Execute(ctx context.Context, c bus.Command) (res bus.Co
 	user = user.ChangeName(cmd.Name)
 	user = user.Grant(userRole)
 
-	events := user.Commit()
+	events := user.Messages(ctx)
+	user.Commit()
 	err = h.users.Persist(user)
 	switch err {
 	case nil:

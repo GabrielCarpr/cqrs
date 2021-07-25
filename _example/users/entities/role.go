@@ -40,7 +40,7 @@ func BuildRole(ID string, Label string) Role {
 		ID:         i,
 		Label:      Label,
 		scopes:     make(map[string]Scope),
-		EventBuffer: bus.NewEventBuffer(i),
+		EventBuffer: bus.NewEventBuffer(i, "Role"),
 	}
 	return r
 }
@@ -55,7 +55,7 @@ func CreateRole(label string) Role {
 		ID:         id,
 		Label:      label,
 		scopes:     make(map[string]Scope),
-		EventBuffer: bus.NewEventBuffer(id),
+		EventBuffer: bus.NewEventBuffer(id, "Role"),
 	}
 	r.Buffer(true, &RoleCreated{Payload: r})
 	return r

@@ -27,11 +27,12 @@ func TestEventBufferCommits(t *testing.T) {
 
 	e := &TestEvent{Payload: "Hi"}
 	e2 := &TestEvent{Payload: "Bye"}
-	queue.Buffer(context.Background(), true, e, e2)
+	queue.Buffer(true, e, e2)
 
-	events := queue.Commit()
+	events := queue.Events(context.Background())
+	queue.Commit()
 	assert.Len(t, events, 2)
-	assert.Len(t, queue.Events(), 0)
+	assert.Len(t, queue.Events(context.Background()), 0)
 	event := events[0].(*TestEvent)
 	assert.Equal(t, owner.String(), event.Owner)
 }
@@ -41,15 +42,16 @@ func TestEventBufferVersions(t *testing.T) {
 	require.Equal(t, int64(0), queue.Version)
 
 	e := &TestEvent{Payload: "Hi"}
-	queue.Buffer(context.Background(), false, e)
+	queue.Buffer(false, e)
 	require.Equal(t, int64(1), queue.Version)
 	require.Equal(t, int64(1), queue.PendingVersion())
 
-	queue.Buffer(context.Background(), true, e)
+	queue.Buffer(true, e)
 	require.Equal(t, int64(1), queue.Version)
 	require.Equal(t, int64(2), queue.PendingVersion())
 
-	msgs := queue.Commit()
+	msgs := queue.Events(context.Background())
+	queue.Commit()
 	require.Len(t, msgs, 1)
 	require.Equal(t, int64(2), queue.Version)
 	require.Equal(t, int64(2), queue.PendingVersion())
@@ -92,7 +94,7 @@ func (e *testEntity) ApplyChange(new bool, events ...bus.Event) {
 		case *testNameChanged:
 			e.Name = event.Name
 		}
-		e.Buffer(context.Background(), new, event)
+		e.Buffer(new, event)
 	}
 }
 
@@ -115,7 +117,7 @@ func TestApplyChange(t *testing.T) {
 	require.Equal(t, int64(0), entity.Version)
 	require.Equal(t, int64(1), entity.PendingVersion())
 
-	events := entity.Events()
+	events := entity.Events(context.Background())
 	entity.Commit()
 	require.Equal(t, "test.name.changed", events[0].Event())
 	require.Equal(t, int64(1), events[0].Versioned())
@@ -151,8 +153,8 @@ func TestApplyCtxToEvent(t *testing.T) {
 	ctx := context.WithValue(context.Background(), stringKey, "hi")
 	buffer := bus.NewEventBuffer(uuid.New(), "test")
 
-	buffer.Buffer(ctx, true, &TestEvent{Payload: "lol"})
+	buffer.Buffer(true, &TestEvent{Payload: "lol"})
 
-	e := buffer.Events()[0].(*TestEvent)
+	e := buffer.Events(ctx)[0].(*TestEvent)
 	require.Equal(t, "hi", e.Metadata["stringKey"])
 }

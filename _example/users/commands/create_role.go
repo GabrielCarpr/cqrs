@@ -49,12 +49,13 @@ func (h *CreateRoleHandler) Execute(ctx context.Context, c bus.Command) (res bus
 	role := entities.CreateRole(cmd.Name)
 	role = role.ApplyScopes(cmd.Scopes...)
 
-	events := role.Commit()
+	events := role.Messages(ctx)
 	err := h.roles.Persist(role)
 	switch err {
 	case nil:
 		res = bus.CommandResponse{ID: role.ID.String()}
 		msgs = append(msgs, events...)
+		role.Commit()
 		return
 	default:
 		res = bus.CommandResponse{Error: err}

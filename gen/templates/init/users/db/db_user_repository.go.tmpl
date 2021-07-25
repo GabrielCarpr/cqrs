@@ -88,7 +88,7 @@ func (d dbUser) User() entities.User {
 		LastSignedIn: time,
 		CreatedAt:    d.CreatedAt,
 		UpdatedAt:    d.UpdatedAt,
-		EventBuffer:   bus.NewEventBuffer(d.ID),
+		EventBuffer:   bus.NewEventBuffer(d.ID, "User"),
 	}
 	u.ForceVersion(d.Version)
 	return u

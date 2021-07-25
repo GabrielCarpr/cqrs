@@ -173,7 +173,7 @@ func (e EventBuffer) JSONMarshal() ([]byte, error) {
 
 // Buffer adds events to the buffer queue,
 // and sets their owner simutaneously
-func (e *EventBuffer) Buffer(ctx context.Context, isNew bool, events ...Event) {
+func (e *EventBuffer) Buffer(isNew bool, events ...Event) {
 	for _, event := range events {
 		if !isNew {
 			e.Version++
@@ -183,25 +183,33 @@ func (e *EventBuffer) Buffer(ctx context.Context, isNew bool, events ...Event) {
 		event.IsVersion(e.PendingVersion() + 1)
 		event.PublishedAt(time.Now())
 		event.ForAggregate(e.Type)
-		event.WithMetadata(make(Metadata))
-		m := Metadata(SerializeContext(ctx))
-		event.WithMetadata(m)
 		e.events = append(e.events, event)
 	}
 }
 
 // Messages returns the event queue as messages
-func (e *EventBuffer) Messages() []message.Message {
-	output := make([]message.Message, len(e.events))
-	for i, event := range e.events {
+func (e *EventBuffer) Messages(ctx context.Context) []message.Message {
+	events := e.applyMetadata(ctx, e.events...)
+	output := make([]message.Message, len(events))
+	for i, event := range events {
 		output[i] = event
 	}
 	return output
 }
 
 // Events empties the event queue, returning events
-func (e *EventBuffer) Events() []Event {
-	return e.events
+func (e *EventBuffer) Events(ctx context.Context) []Event {
+	return e.applyMetadata(ctx, e.events...)
+}
+
+func (e *EventBuffer) applyMetadata(ctx context.Context, events ...Event) []Event {
+	result := make([]Event, len(events))
+	for i, ev := range events {
+		m := Metadata(SerializeContext(ctx))
+		ev.WithMetadata(m)
+		result[i] = ev
+	}
+	return result
 }
 
 // Flush clears the event queue, without committing
@@ -221,14 +229,12 @@ func (e *EventBuffer) PendingVersion() int64 {
 	return e.Version + int64(len(e.events))
 }
 
-// Commit releases pending events, and commits the new version to
-// the entity. It is assumed that after calling commit, the entity
-// with be persisted (with new version), and events published
-func (e *EventBuffer) Commit() []Event {
-	output := e.Events()
+// Commit commits the new version to
+// the entity. It is assumed that before calling commit, the entity
+// has been persisted (with new version), and events published
+func (e *EventBuffer) Commit() {
 	e.Version = e.PendingVersion()
 	e.Flush()
-	return output
 }
 
 // ForceVersion forces the entity version, useful when not
