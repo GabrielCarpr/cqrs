@@ -1,4 +1,4 @@
-// +build !unit
+// +build !unitsd
 
 package eventstore_test
 
@@ -51,7 +51,8 @@ func TestPostgresEventStore(t *testing.T) {
 		},
 	}
 	s.setupHook = func() error {
-		postgres.ResetSQLDB(c.DBDsn())
+		schema := postgres.PostgreSQLSchema{Config: c}
+		schema.Reset()
 		return nil
 	}
 	suite.Run(t, s)
@@ -78,6 +79,7 @@ func (s *EventStoreBlackboxTest) SetupTest() {
 	s.entity = uuid.New()
 	s.buffer = Buffer(s.entity)
 	s.otherBuffer = Buffer(uuid.New())
+	bus.RegisterMessage(&TestEvent{})
 
 	if s.setupHook != nil {
 		err := s.setupHook()
@@ -94,7 +96,7 @@ func (s *EventStoreBlackboxTest) TearDownTest() {
 func (s EventStoreBlackboxTest) TestAppendsEventsAndStreams() {
 	e := &TestEvent{Name: "Gabriel", Age: 24}
 	s.buffer.Buffer(true, e)
-	evs := s.buffer.Events()
+	evs := s.buffer.Events(context.Background())
 	err := s.store.Append(
 		context.Background(),
 		bus.ExpectedVersion(s.buffer.CurrentVersion()),
@@ -104,7 +106,7 @@ func (s EventStoreBlackboxTest) TestAppendsEventsAndStreams() {
 
 	e2 := &TestEvent{Name: "Gabriel", Age: 24}
 	s.otherBuffer.Buffer(true, e2)
-	evs2 := s.otherBuffer.Events()
+	evs2 := s.otherBuffer.Events(context.Background())
 	err = s.store.Append(
 		context.Background(),
 		bus.ExpectedVersion(s.otherBuffer.CurrentVersion()),
@@ -131,13 +133,16 @@ loop:
 		select {
 		case <-ctx.Done():
 			break loop
-		case ev := <-stream:
+		case ev, ok := <-stream:
+			if !ok {
+				break loop
+			}
 			results = append(results, ev)
 		}
 	}
 
 	err = group.Wait()
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.Len(results, 1)
 }
 
@@ -148,7 +153,7 @@ func (s EventStoreBlackboxTest) TestAppendsEventAndStreamsFrom() {
 	}
 	s.buffer.Buffer(true, events...)
 
-	err := s.store.Append(context.Background(), bus.ExpectedVersion(s.buffer.Version), s.buffer.Events()...)
+	err := s.store.Append(context.Background(), bus.ExpectedVersion(s.buffer.Version), s.buffer.Events(context.Background())...)
 	s.NoError(err)
 
 	var result []bus.Event
@@ -174,7 +179,7 @@ func (s EventStoreBlackboxTest) TestAppendsEventAndStreamsFrom() {
 func (s EventStoreBlackboxTest) TestStreamsAll() {
 	e := &TestEvent{Name: "Gabriel", Age: 24}
 	s.buffer.Buffer(true, e)
-	evs := s.buffer.Events()
+	evs := s.buffer.Events(context.Background())
 	err := s.store.Append(
 		context.Background(),
 		bus.ExpectedVersion(s.buffer.CurrentVersion()),
@@ -184,7 +189,7 @@ func (s EventStoreBlackboxTest) TestStreamsAll() {
 
 	e2 := &TestEvent{Name: "Gabriel", Age: 24}
 	s.otherBuffer.Buffer(true, e2)
-	evs2 := s.otherBuffer.Events()
+	evs2 := s.otherBuffer.Events(context.Background())
 	err = s.store.Append(
 		context.Background(),
 		bus.ExpectedVersion(s.otherBuffer.CurrentVersion()),
@@ -214,7 +219,7 @@ func (s EventStoreBlackboxTest) TestOptimisticLocking() {
 	err := s.store.Append(
 		context.Background(),
 		bus.ExpectedVersion(s.buffer.CurrentVersion()),
-		s.buffer.Events()...,
+		s.buffer.Events(context.Background())...,
 	)
 	s.NoError(err)
 
@@ -225,7 +230,7 @@ func (s EventStoreBlackboxTest) TestOptimisticLocking() {
 	err = s.store.Append(
 		context.Background(),
 		bus.ExpectedVersion(s.buffer.CurrentVersion()),
-		s.buffer.Events()...,
+		s.buffer.Events(context.Background())...,
 	)
 	s.Require().Error(err)
 	s.EqualError(err, eventstore.ErrConcurrencyViolation.Error())
@@ -234,10 +239,10 @@ func (s EventStoreBlackboxTest) TestOptimisticLocking() {
 func (s EventStoreBlackboxTest) TestEnforcesSameStreamAppends() {
 	e := &TestEvent{Name: "Gabriel", Age: 23}
 	e.ForAggregate("lol")
-	e.OwnedBy(uuid.New())
+	e.OwnedBy(uuid.New().String())
 	e2 := &TestEvent{Name: "Giddian", Age: 99}
-	e.ForAggregate("yomp")
-	e.OwnedBy(uuid.New())
+	e2.ForAggregate("yomp")
+	e2.OwnedBy(uuid.New().String())
 
 	err := s.store.Append(context.Background(), bus.ExpectedVersion(0), e, e2)
 	s.Require().Error(err)
@@ -251,7 +256,7 @@ func (s EventStoreBlackboxTest) TestSubscribesAll() {
 	for i := 0; i < 5; i++ {
 		event := &TestEvent{Name: "Gabriel", Age: 25 + i}
 		s.buffer.Buffer(true, event)
-		err := s.store.Append(ctx, bus.ExpectedVersion(s.buffer.Version), s.buffer.Events()...)
+		err := s.store.Append(ctx, bus.ExpectedVersion(s.buffer.Version), s.buffer.Events(context.Background())...)
 		s.buffer.Commit()
 		s.Require().NoError(err)
 	}
@@ -288,7 +293,7 @@ func (s EventStoreBlackboxTest) TestSubscribesConcurrentlyInOrder() {
 	for i := 0; i < 100; i++ {
 		event := &TestEvent{Name: "Gabriel", Age: 25 + i}
 		s.buffer.Buffer(true, event)
-		err := s.store.Append(ctx, bus.ExpectedVersion(s.buffer.Version), s.buffer.Events()...)
+		err := s.store.Append(ctx, bus.ExpectedVersion(s.buffer.Version), s.buffer.Events(context.Background())...)
 		s.buffer.Commit()
 		s.Require().NoError(err)
 	}

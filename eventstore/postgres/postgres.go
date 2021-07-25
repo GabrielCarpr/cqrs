@@ -1,37 +1,28 @@
 package postgres
 
 import (
-	"bytes"
 	"context"
-	stdSQL "database/sql"
-	"encoding/gob"
+	"database/sql"
+	"fmt"
+	"strings"
 
 	"github.com/GabrielCarpr/cqrs/bus"
-	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill-sql/pkg/sql"
-	wmMessage "github.com/ThreeDotsLabs/watermill/message"
+	"github.com/GabrielCarpr/cqrs/eventstore"
 	_ "github.com/lib/pq"
 )
 
 func New(c Config) *PostgresEventStore {
 	db := makeDB(c)
-	var logger watermill.LoggerAdapter
-	publisher, err := sql.NewPublisher(
-		db,
-		sql.PublisherConfig{
-			SchemaAdapter:        PostgreSQLSchema{},
-			AutoInitializeSchema: true,
-		},
-		logger,
-	)
+	schema := PostgreSQLSchema{c}
+	err := schema.Make()
 	if err != nil {
 		panic(err)
 	}
-	return &PostgresEventStore{db, publisher}
+	return &PostgresEventStore{db}
 }
 
-func makeDB(c Config) *stdSQL.DB {
-	db, err := stdSQL.Open("postgres", c.DBDsn())
+func makeDB(c Config) *sql.DB {
+	db, err := sql.Open("postgres", c.DBDsn())
 	if err != nil {
 		panic(err)
 	}
@@ -45,74 +36,129 @@ func makeDB(c Config) *stdSQL.DB {
 }
 
 type PostgresEventStore struct {
-	db        *stdSQL.DB
-	publisher wmMessage.Publisher
+	db *sql.DB
 }
 
 func (s *PostgresEventStore) Close() error {
-	return s.publisher.Close()
+	return s.db.Close()
 }
 
 func (s *PostgresEventStore) Append(ctx context.Context, v bus.ExpectedVersion, events ...bus.Event) error {
-	msgs := make([]*wmMessage.Message, 0)
-	for _, event := range events {
-		msg, err := s.toMessage(ctx, event)
-		if err != nil {
-			return err
-		}
-		msgs = append(msgs, msg)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
 	}
 
-	return s.publisher.Publish("event_store", msgs...)
+	last, err := s.lastEvent(tx, bus.StreamID{ID: events[0].Owned(), Type: events[0].FromAggregate()})
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	if err := eventstore.CheckExpectedVersion(last, v); err != nil {
+		tx.Rollback()
+		return err
+	}
+	if err := eventstore.CheckEventsConsistent(events...); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	for _, event := range events {
+		data, err := bus.SerializeMessage(event, bus.Json)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		_, err = tx.Exec(`INSERT INTO events (owner, type, at, version, payload)
+			VALUES ($1, $2, $3, $4, $5)`,
+			event.Owned(),
+			event.FromAggregate(),
+			event.WasPublishedAt(),
+			event.Versioned(),
+			data,
+		)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	err = tx.Commit()
+	return err
 }
 
-func (s *PostgresEventStore) toMessage(ctx context.Context, event bus.Event) (*wmMessage.Message, error) {
-	var payload bytes.Buffer
-	enc := gob.NewEncoder(&payload)
-	err := enc.Encode(event)
+func (s *PostgresEventStore) lastEvent(tx *sql.Tx, id bus.StreamID) (bus.Event, error) {
+	row := tx.QueryRow("SELECT payload FROM events WHERE owner = $1 and type = $2 ORDER BY version DESC LIMIT 1", id.ID, id.Type)
+	var data []byte
+	err := row.Scan(&data)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+	if err != nil && err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	msg, err := bus.DeserializeMessage(data)
 	if err != nil {
 		return nil, err
 	}
-
-	result := wmMessage.NewMessage(watermill.NewUUID(), payload.Bytes())
-	return result, nil
+	return msg.(bus.Event), nil
 }
 
 func (s *PostgresEventStore) Stream(ctx context.Context, stream bus.Stream, q bus.Select) error {
 	defer close(stream)
-	var logger watermill.LoggerAdapter
-	subscriber, err := sql.NewSubscriber(s.db, sql.SubscriberConfig{
-		SchemaAdapter:    PostgreSQLSchema{},
-		OffsetsAdapter:   sql.DefaultPostgreSQLOffsetsAdapter{},
-		InitializeSchema: true,
-	}, logger)
+
+	query := []string{}
+	args := []interface{}{}
+	argNum := 1
+	query = append(query, "SELECT payload FROM events")
+	if q.StreamID.ID != "" || q.StreamID.Type != "" || q.From != 0 {
+		query = append(query, "WHERE")
+	}
+	if q.StreamID.ID != "" {
+		query = append(query, fmt.Sprintf("owner = $%v", argNum))
+		argNum++
+		args = append(args, q.StreamID.ID)
+	}
+	if q.StreamID.Type != "" {
+		if argNum != 1 {
+			query = append(query, "AND")
+		}
+		query = append(query, fmt.Sprintf("type = $%v", argNum))
+		argNum++
+		args = append(args, q.StreamID.Type)
+	}
+	if q.From != 0 {
+		if argNum != 1 {
+			query = append(query, "AND")
+		}
+		query = append(query, fmt.Sprintf("version >= $%v", argNum))
+		argNum++
+		args = append(args, q.From)
+	}
+	query = append(query, "ORDER BY version ASC")
+	rows, err := s.db.QueryContext(ctx, strings.Join(query, " "), args...)
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
 
-	messages, err := subscriber.Subscribe(ctx, "event_store")
-	if err != nil {
-		return err
-	}
-
-	for msg := range messages {
-		_, event, err := s.fromMessage(msg)
+	var data []byte
+	for rows.Next() {
+		err = rows.Scan(&data)
 		if err != nil {
 			return err
 		}
 
-		stream <- event
+		event, err := bus.DeserializeMessage(data)
+		if err != nil {
+			return err
+		}
+		stream <- event.(bus.Event)
 	}
+	err = rows.Err()
 
-	return nil
-}
-
-func (s *PostgresEventStore) fromMessage(msg *wmMessage.Message) (context.Context, bus.Event, error) {
-	var result bus.Event
-	ctx := context.Background()
-	dec := gob.NewDecoder(bytes.NewBuffer(msg.Payload))
-	err := dec.Decode(&result)
-	return ctx, result, err
+	return err
 }
 
 func (s *PostgresEventStore) Subscribe(ctx context.Context, subscribe func(bus.Event) error) error {

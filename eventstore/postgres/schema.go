@@ -4,38 +4,40 @@ import (
 	"log"
 	"strings"
 
-	stdSQL "database/sql"
-
-	wmSql "github.com/ThreeDotsLabs/watermill-sql/pkg/sql"
+	"database/sql"
 )
 
 // PostgreSQLSchema is an implementation of SchemaAdapter based on PostgreSQL.
 type PostgreSQLSchema struct {
-	wmSql.DefaultPostgreSQLSchema
+	Config Config
 }
 
-func (s PostgreSQLSchema) SchemaInitializingQueries(topic string) []string {
-	createMessagesTable := strings.Join([]string{
-		`CREATE TABLE IF NOT EXISTS ` + s.MessagesTable(topic) + ` (`,
-		`"offset" SERIAL,`,
-		`"uuid" VARCHAR(36) NOT NULL,`,
-		`"created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,`,
-		`"payload" BYTEA DEFAULT NULL,`,
-		`"metadata" JSON DEFAULT NULL`,
-		`);`,
-	}, "\n")
+func (s PostgreSQLSchema) Make() error {
+	log.Print("Creating event store")
+	db, err := sql.Open("postgres", s.Config.DBDsn())
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS events (
+		"offset" SERIAL,
+		"owner" VARCHAR(36) NOT NULL,
+		"type" VARCHAR(64) NOT NULL,
+		"at" TIMESTAMP NOT NULL,
+		"version" BIGINT,
+		"payload" JSON NOT NULL
+	);`)
 
-	return []string{createMessagesTable}
+	return err
 }
 
-func ResetSQLDB(dsn string) {
-	log.Print("Resetting SQL queue database")
-	db, err := stdSQL.Open("postgres", dsn)
+func (s PostgreSQLSchema) Reset() {
+	log.Print("Resetting event store")
+	db, err := sql.Open("postgres", s.Config.DBDsn())
 	if err != nil {
 		panic(err)
 	}
 
-	_, err = db.Exec("DELETE FROM watermill_messages")
+	_, err = db.Exec("DELETE FROM events")
 	if err != nil && !strings.Contains(err.Error(), "does not exist") {
 		panic(err)
 	}
