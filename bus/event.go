@@ -17,6 +17,12 @@ func init() {
 
 type Metadata map[string]string
 
+func (m Metadata) Merge(n Metadata) {
+	for key, val := range n {
+		m[key] = val
+	}
+}
+
 // Event is a routable event indicating something has happened.
 // Events are fanned out to both sync and async handlers
 type Event interface {
@@ -74,7 +80,12 @@ func (e EventType) MessageType() message.Type {
 }
 
 func (e *EventType) WithMetadata(m Metadata) {
-	e.Metadata = m
+	if e.Metadata == nil {
+		e.Metadata = m
+		return
+	}
+
+	e.Metadata.Merge(m)
 }
 
 func (e *EventType) HasMetadata() Metadata {
@@ -162,7 +173,7 @@ func (e EventBuffer) JSONMarshal() ([]byte, error) {
 
 // Buffer adds events to the buffer queue,
 // and sets their owner simutaneously
-func (e *EventBuffer) Buffer(isNew bool, events ...Event) {
+func (e *EventBuffer) Buffer(ctx context.Context, isNew bool, events ...Event) {
 	for _, event := range events {
 		if !isNew {
 			e.Version++
@@ -173,6 +184,8 @@ func (e *EventBuffer) Buffer(isNew bool, events ...Event) {
 		event.PublishedAt(time.Now())
 		event.ForAggregate(e.Type)
 		event.WithMetadata(make(Metadata))
+		m := Metadata(SerializeContext(ctx))
+		event.WithMetadata(m)
 		e.events = append(e.events, event)
 	}
 }

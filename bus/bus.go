@@ -2,7 +2,6 @@ package bus
 
 import (
 	"context"
-	"encoding/gob"
 	"fmt"
 	stdlog "log"
 	"os"
@@ -43,7 +42,7 @@ func New(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 		}
 	}
 	c := builder.Build()
-	gob.Register(queuedEvent{})
+	RegisterMessage(queuedEvent{})
 
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, os.Kill)
 	b := &Bus{
@@ -168,9 +167,9 @@ func (b *Bus) ExtendEvents(rules ...EventRules) *Bus {
 	for _, rule := range rules {
 		b.routes.Extend(rule)
 		for event := range rule {
-			stdlog.Printf("Registered event with gob: %s", event.Event())
-			gob.Register(event)
-			gob.Register(&event)
+			stdlog.Printf("Registered event: %s", event.Event())
+			RegisterMessage(event)
+			RegisterMessage(event)
 		}
 	}
 	return b
@@ -182,11 +181,6 @@ func (b *Bus) ExtendCommands(fn func(CmdBuilder)) {
 
 func (b *Bus) ExtendQueries(fn func(QueryBuilder)) {
 	b.routes.ExtendQueries(fn)
-}
-
-// RegisterContextKey registers a context key interpretation value for serialization
-func (b *Bus) RegisterContextKey(key interface{ String() string }, fn func(j []byte) interface{}) {
-	b.queue.RegisterCtxKey(key, fn)
 }
 
 // Use registers middleware and guards. Accepts a union of command/query guards and middleware.

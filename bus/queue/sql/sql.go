@@ -6,13 +6,14 @@ import (
 	stdSQL "database/sql"
 	"encoding/gob"
 	"fmt"
-	"github.com/GabrielCarpr/cqrs/log"
 	stdlog "log"
 	"time"
 
+	"github.com/GabrielCarpr/cqrs/bus"
+	"github.com/GabrielCarpr/cqrs/log"
+
 	_ "github.com/lib/pq"
 
-	ctxSx "github.com/GabrielCarpr/cqrs/bus/context"
 	"github.com/GabrielCarpr/cqrs/bus/message"
 
 	"github.com/ThreeDotsLabs/watermill"
@@ -49,23 +50,18 @@ func NewSQLQueue(c Config) *SQLQueue {
 	if err != nil {
 		panic(err)
 	}
-	return &SQLQueue{db, logger, publisher, ctxSx.NewContextSerializer()}
+	return &SQLQueue{db, logger, publisher}
 }
 
 type SQLQueue struct {
-	db            *stdSQL.DB
-	logger        watermill.LoggerAdapter
-	publisher     wmMessage.Publisher
-	ctxSerializer *ctxSx.ContextSerializer
+	db        *stdSQL.DB
+	logger    watermill.LoggerAdapter
+	publisher wmMessage.Publisher
 }
 
 func (q *SQLQueue) Close() {
 	stdlog.Print("Closing queue...")
 	q.publisher.Close()
-}
-
-func (q *SQLQueue) RegisterCtxKey(key interface{ String() string }, fn func([]byte) interface{}) {
-	q.ctxSerializer.Register(key, fn)
 }
 
 func (q *SQLQueue) fromMessage(ctx context.Context, msg message.Message) (*wmMessage.Message, error) {
@@ -77,7 +73,7 @@ func (q *SQLQueue) fromMessage(ctx context.Context, msg message.Message) (*wmMes
 	}
 
 	result := wmMessage.NewMessage(watermill.NewUUID(), payload.Bytes())
-	result.Metadata = wmMessage.Metadata(q.ctxSerializer.Serialize(ctx))
+	result.Metadata = wmMessage.Metadata(bus.SerializeContext(ctx))
 	return result, nil
 }
 
@@ -86,7 +82,7 @@ func (q *SQLQueue) toMessage(msg *wmMessage.Message) (context.Context, message.M
 	dec := gob.NewDecoder(bytes.NewBuffer(msg.Payload))
 	err := dec.Decode(&result)
 	metadata := map[string]string(msg.Metadata)
-	return q.ctxSerializer.Deserialize(context.Background(), metadata), result, err
+	return bus.DeserializeContext(context.Background(), metadata), result, err
 }
 
 func (q *SQLQueue) Subscribe(topCtx context.Context, fn func(context.Context, message.Message) error) {
@@ -169,7 +165,7 @@ func (q *SQLQueue) Publish(ctx context.Context, msgs ...message.Message) error {
 		if err != nil {
 			return err
 		}
-		deliver.Metadata = wmMessage.Metadata(q.ctxSerializer.Serialize(ctx))
+		deliver.Metadata = wmMessage.Metadata(bus.SerializeContext(ctx))
 
 		log.Info(ctx, "Publishing message", log.F{"ID": deliver.UUID})
 		err = q.publisher.Publish("messages", deliver)
