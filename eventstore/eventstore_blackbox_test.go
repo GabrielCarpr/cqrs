@@ -4,6 +4,7 @@ package eventstore_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -338,3 +339,123 @@ func (s EventStoreBlackboxTest) TestSubscribesConcurrentlyOnceOnly() {
 		versions[event.Versioned()] = struct{}{}
 	}
 }
+
+func (s EventStoreBlackboxTest) TestSubscribeErrorNacks() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*70)
+	defer cancel()
+
+	for i := 0; i < 3; i++ {
+		event := &TestEvent{Name: "Gabriel", Age: 25 + i}
+		s.buffer.Buffer(true, event)
+		err := s.store.Append(ctx, bus.ExpectedVersion(s.buffer.Version), s.buffer.Events(context.Background())...)
+		s.buffer.Commit()
+		s.Require().NoError(err, "on append #%d", i)
+	}
+
+	received := 0
+	err := s.store.Subscribe(ctx, func(e bus.Event) error {
+		s.Equal(25, e.(*TestEvent).Age)
+		received++
+		if received >= 3 {
+			cancel()
+		}
+		return errors.New("test error")
+	})
+	s.Require().NoError(err)
+
+	s.Require().GreaterOrEqual(received, 3)
+}
+
+func (s EventStoreBlackboxTest) TestConcurrentAppends() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*500)
+	defer cancel()
+
+	s.buffer.Buffer(true, &TestEvent{Name: "Gabriel"})
+	event := s.buffer.Events(context.Background())[0]
+
+	start := make(chan struct{})
+	group, ctx := errgroup.WithContext(ctx)
+	errors := 0
+	for i := 0; i < 100; i++ {
+		i := i
+		group.Go(func() error {
+			<-start
+			err := s.store.Append(ctx, bus.ExpectedVersion(0), event)
+			if err != nil {
+				s.Require().EqualError(err, eventstore.ErrConcurrencyViolation.Error(), "Error'd on: %d", i)
+				errors++
+			}
+			return nil
+		})
+	}
+
+	close(start)
+	group.Wait()
+
+	s.Equal(99, errors)
+}
+
+func (s EventStoreBlackboxTest) TestSubscribesInOrder() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*2000)
+	defer cancel()
+
+	for i := 0; i < 500; i++ {
+		s.buffer.Buffer(true, &TestEvent{Name: "Gabriel", Age: 25 + i})
+		event := s.buffer.Events(ctx)[0]
+		err := s.store.Append(ctx, bus.ExpectedVersion(s.buffer.Version), event)
+		s.buffer.Commit()
+		s.Require().NoError(err)
+	}
+
+	results := []int{}
+	s.store.Subscribe(ctx, func(e bus.Event) error {
+		age := e.(*TestEvent).Age
+		results = append(results, age)
+		if age == 524 {
+			cancel()
+		}
+		return nil
+	})
+
+	starting := 25
+	for _, age := range results {
+		s.Require().Equal(starting, age)
+		starting++
+	}
+}
+
+func (s EventStoreBlackboxTest) TestCloseDoesntLoseEvents() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*600)
+	defer cancel()
+
+	for i := 0; i < 3; i++ {
+		s.buffer.Buffer(true, &TestEvent{Name: "Gabriel", Age: 25 + i})
+		event := s.buffer.Events(ctx)[0]
+		err := s.store.Append(ctx, bus.ExpectedVersion(s.buffer.Version), event)
+		s.buffer.Commit()
+		s.Require().NoError(err)
+	}
+
+	results := make(map[int]int)
+	s.store.Subscribe(ctx, func(e bus.Event) error {
+		s.store.Close()
+		return nil
+	})
+
+	if opener, ok := s.store.(interface{ Open() }); ok {
+		opener.Open()
+	} else {
+		s.store = s.factory()
+	}
+	err := s.store.Subscribe(ctx, func(e bus.Event) error {
+		results[e.(*TestEvent).Age] += 1
+		return nil
+	})
+	s.NoError(err)
+
+	s.GreaterOrEqual(results[25], 1)
+	s.GreaterOrEqual(results[26], 1)
+	s.GreaterOrEqual(results[27], 1)
+}
+
+// Add another test to test postgres not acking, and timing out reserved

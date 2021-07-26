@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -12,21 +13,26 @@ import (
 type MemoryEventStore struct {
 	events []bus.Event
 
-	mx sync.Mutex
+	mx     sync.Mutex
+	closed bool
 
 	offset int
 }
 
 func (s *MemoryEventStore) Append(ctx context.Context, v bus.ExpectedVersion, events ...bus.Event) error {
-	if err := eventstore.CheckEventsConsistent(events...); err != nil {
-		return err
+	if s.closed {
+		return errors.New("closed")
 	}
-	last := s.lastEventFor(bus.StreamID{Type: events[0].FromAggregate(), ID: events[0].Owned()})
-	if err := eventstore.CheckExpectedVersion(last, v); err != nil {
+	if err := eventstore.CheckEventsConsistent(events...); err != nil {
 		return err
 	}
 	s.mx.Lock()
 	defer s.mx.Unlock()
+
+	last := s.lastEventFor(bus.StreamID{Type: events[0].FromAggregate(), ID: events[0].Owned()})
+	if err := eventstore.CheckExpectedVersion(last, v); err != nil {
+		return err
+	}
 
 	s.events = append(s.events, events...)
 	return nil
@@ -48,6 +54,10 @@ func (s *MemoryEventStore) lastEventFor(id bus.StreamID) bus.Event {
 
 func (s *MemoryEventStore) Stream(ctx context.Context, stream bus.Stream, q bus.Select) error {
 	defer close(stream)
+	if s.closed {
+		return errors.New("closed")
+	}
+
 	for _, event := range s.events {
 		if q.Type != "" && event.FromAggregate() != q.Type {
 			continue
@@ -65,7 +75,11 @@ func (s *MemoryEventStore) Stream(ctx context.Context, stream bus.Stream, q bus.
 }
 
 func (s *MemoryEventStore) Subscribe(ctx context.Context, subscription func(bus.Event) error) error {
-	errors := 0
+	if s.closed {
+		return errors.New("closed")
+	}
+
+	errs := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -79,11 +93,14 @@ func (s *MemoryEventStore) Subscribe(ctx context.Context, subscription func(bus.
 				}
 				res := subscription(s.events[s.offset])
 				if res != nil {
-					errors++
-					if errors > 4 {
+					errs++
+					if errs > 4 {
 						return res // There were 5 errors and retrying didn't work
 					}
 					return nil // There was an error but we can retry
+				}
+				if s.closed {
+					return errors.New("closed")
 				}
 				s.offset++
 				return nil // Success
@@ -96,5 +113,10 @@ func (s *MemoryEventStore) Subscribe(ctx context.Context, subscription func(bus.
 }
 
 func (s *MemoryEventStore) Close() error {
+	s.closed = true
 	return nil
+}
+
+func (s *MemoryEventStore) Open() {
+	s.closed = false
 }

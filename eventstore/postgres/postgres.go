@@ -37,10 +37,12 @@ func makeDB(c Config) *sql.DB {
 }
 
 type PostgresEventStore struct {
-	db *sql.DB
+	db     *sql.DB
+	closed bool
 }
 
 func (s *PostgresEventStore) Close() error {
+	s.closed = true
 	return s.db.Close()
 }
 
@@ -216,7 +218,7 @@ func (s *PostgresEventStore) Subscribe(ctx context.Context, subscribe func(bus.E
 		err = subscribe(msg.(bus.Event))
 		if err != nil {
 			tx.Rollback()
-			return
+			continue
 		}
 
 		err = tx.Commit()
