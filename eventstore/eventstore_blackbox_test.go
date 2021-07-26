@@ -286,8 +286,8 @@ func (s EventStoreBlackboxTest) TestNoEventsDoesntCallBack() {
 	s.Require().NoError(err)
 }
 
-func (s EventStoreBlackboxTest) TestSubscribesConcurrentlyInOrder() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*50)
+func (s EventStoreBlackboxTest) TestSubscribesConcurrentlyOnceOnly() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
 	defer cancel()
 
 	for i := 0; i < 100; i++ {
@@ -295,7 +295,7 @@ func (s EventStoreBlackboxTest) TestSubscribesConcurrentlyInOrder() {
 		s.buffer.Buffer(true, event)
 		err := s.store.Append(ctx, bus.ExpectedVersion(s.buffer.Version), s.buffer.Events(context.Background())...)
 		s.buffer.Commit()
-		s.Require().NoError(err)
+		s.Require().NoError(err, "on append #%d", i)
 	}
 
 	start := make(chan struct{})
@@ -324,13 +324,17 @@ func (s EventStoreBlackboxTest) TestSubscribesConcurrentlyInOrder() {
 		}
 	}
 
+	ages := make(map[int]struct{})
+	versions := make(map[int64]struct{})
 	s.Require().Len(end, 100)
-	age := 25
-	var version int64 = 1
 	for _, event := range end {
-		s.Require().Equal(age, event.(*TestEvent).Age)
-		s.Require().Equal(version, event.Versioned())
-		age++
-		version++
+		if _, ok := ages[event.(*TestEvent).Age]; ok {
+			s.FailNow("Age already delivered")
+		}
+		if _, ok := versions[event.Versioned()]; ok {
+			s.FailNow("Version already delivered")
+		}
+		ages[event.(*TestEvent).Age] = struct{}{}
+		versions[event.Versioned()] = struct{}{}
 	}
 }

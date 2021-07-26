@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/GabrielCarpr/cqrs/bus"
+	"github.com/GabrielCarpr/cqrs/bus/message"
 	"github.com/GabrielCarpr/cqrs/eventstore"
 	_ "github.com/lib/pq"
 )
@@ -161,6 +162,69 @@ func (s *PostgresEventStore) Stream(ctx context.Context, stream bus.Stream, q bu
 	return err
 }
 
-func (s *PostgresEventStore) Subscribe(ctx context.Context, subscribe func(bus.Event) error) error {
+func (s *PostgresEventStore) Subscribe(ctx context.Context, subscribe func(bus.Event) error) (err error) {
+	for {
+		if ctx.Err() != nil {
+			break
+		}
+
+		var tx *sql.Tx
+		tx, err = s.db.Begin()
+		if err != nil {
+			return
+		}
+
+		claim := `
+		UPDATE events
+		SET reserved_at = NOW()
+		WHERE "offset" = (
+			SELECT "offset"
+			FROM events
+			WHERE reserved_at IS NULL
+			ORDER BY "offset" ASC
+			LIMIT 1
+			FOR UPDATE SKIP LOCKED
+		)
+		RETURNING "offset"`
+
+		var offset int
+		err1 := tx.QueryRow(claim).Scan(&offset)
+		if err1 != nil && err1 != sql.ErrNoRows {
+			err = err1
+			tx.Rollback()
+			return
+		}
+		if err1 != nil && err1 == sql.ErrNoRows {
+			tx.Rollback()
+			continue
+		}
+
+		var data []byte
+		err = tx.QueryRow(`SELECT payload FROM events WHERE "offset" = $1`, offset).Scan(&data)
+		if err != nil {
+			tx.Rollback()
+			return
+		}
+
+		var msg message.Message
+		msg, err = bus.DeserializeMessage(data)
+		if err != nil {
+			tx.Rollback()
+			return
+		}
+
+		err = subscribe(msg.(bus.Event))
+		if err != nil {
+			tx.Rollback()
+			return
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			tx.Rollback()
+			return
+		}
+	}
+
 	return nil
 }

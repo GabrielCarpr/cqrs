@@ -19,12 +19,14 @@ func (s PostgreSQLSchema) Make() error {
 		return err
 	}
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS events (
-		"offset" SERIAL,
+		"offset" SERIAL PRIMARY KEY,
 		"owner" VARCHAR(36) NOT NULL,
 		"type" VARCHAR(64) NOT NULL,
 		"at" TIMESTAMP NOT NULL,
 		"version" BIGINT,
-		"payload" JSON NOT NULL
+		"payload" JSON NOT NULL,
+		"reserved_at" TIMESTAMP DEFAULT NULL,
+		"acked_at" TIMESTAMP DEFAULT NULL
 	);`)
 
 	return err
