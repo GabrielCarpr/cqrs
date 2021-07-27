@@ -26,7 +26,8 @@ func (s PostgreSQLSchema) Make() error {
 		"version" BIGINT,
 		"payload" JSON NOT NULL,
 		"reserved_at" TIMESTAMP DEFAULT NULL,
-		"acked_at" TIMESTAMP DEFAULT NULL
+		"acked_at" TIMESTAMP DEFAULT NULL,
+		UNIQUE("type", "owner", "version")
 	);`)
 
 	return err

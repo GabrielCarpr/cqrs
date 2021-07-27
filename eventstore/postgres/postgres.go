@@ -3,8 +3,10 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/GabrielCarpr/cqrs/bus"
@@ -44,6 +46,7 @@ type PostgresEventStore struct {
 	db      *sql.DB
 	closed  bool
 	closing chan struct{}
+	wg      sync.WaitGroup
 }
 
 func (s *PostgresEventStore) Close() error {
@@ -54,14 +57,14 @@ func (s *PostgresEventStore) Close() error {
 	s.closed = true
 
 	close(s.closing)
+	s.wg.Wait()
 
 	return s.db.Close()
 }
 
 func (s *PostgresEventStore) Append(ctx context.Context, v bus.ExpectedVersion, events ...bus.Event) error {
-	if s.closed {
-		return log.Error(ctx, "cannot append, store is closed", log.F{})
-	}
+	s.wg.Add(1)
+	defer s.wg.Done()
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -96,7 +99,13 @@ func (s *PostgresEventStore) Append(ctx context.Context, v bus.ExpectedVersion, 
 			event.Versioned(),
 			data,
 		)
-		if err != nil {
+		switch {
+		case err != nil && strings.Contains(err.Error(), "unique constraint"):
+			tx.Rollback()
+			return eventstore.ErrConcurrencyViolation
+		case err == nil:
+			continue
+		default:
 			tx.Rollback()
 			return err
 		}
@@ -107,7 +116,7 @@ func (s *PostgresEventStore) Append(ctx context.Context, v bus.ExpectedVersion, 
 }
 
 func (s *PostgresEventStore) lastEvent(tx *sql.Tx, id bus.StreamID) (bus.Event, error) {
-	row := tx.QueryRow("SELECT payload FROM events WHERE owner = $1 and type = $2 ORDER BY version DESC LIMIT 1", id.ID, id.Type)
+	row := tx.QueryRow("SELECT payload FROM events WHERE owner = $1 and type = $2 ORDER BY version DESC LIMIT 1 FOR UPDATE", id.ID, id.Type)
 	var data []byte
 	err := row.Scan(&data)
 	if err != nil && err != sql.ErrNoRows {
@@ -125,6 +134,11 @@ func (s *PostgresEventStore) lastEvent(tx *sql.Tx, id bus.StreamID) (bus.Event, 
 }
 
 func (s *PostgresEventStore) Stream(ctx context.Context, stream bus.Stream, q bus.Select) error {
+	if s.closed {
+		return errors.New("store is closed")
+	}
+	s.wg.Add(1)
+	defer s.wg.Done()
 	defer close(stream)
 
 	query, args := s.buildStreamQuery(q)
@@ -136,6 +150,12 @@ func (s *PostgresEventStore) Stream(ctx context.Context, stream bus.Stream, q bu
 
 	var data []byte
 	for rows.Next() {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
 		err = rows.Scan(&data)
 		if err != nil {
 			return err
@@ -187,15 +207,18 @@ func (s *PostgresEventStore) buildStreamQuery(q bus.Select) (string, []interface
 }
 
 func (s *PostgresEventStore) Subscribe(ctx context.Context, subscribe func(bus.Event) error) (err error) {
+	if s.closed {
+		return errors.New("store is closed")
+	}
+	s.wg.Add(1)
+	defer s.wg.Done()
+
 	backoff := 0
 	for {
-		if ctx.Err() != nil || s.closed {
-			log.Info(ctx, "ending postgres event store subscribe loop", log.F{})
-			break
-		}
-		<-time.After(time.Millisecond * time.Duration(backoff))
-
 		select {
+		case <-s.closing:
+			log.Info(ctx, "subscriber closing", log.F{})
+			return nil
 		case <-ctx.Done():
 			log.Info(ctx, "subscribe context finished", log.F{"reason": ctx.Err().Error()})
 			return nil
@@ -207,15 +230,13 @@ func (s *PostgresEventStore) Subscribe(ctx context.Context, subscribe func(bus.E
 		err, processed := s.run(ctx, subscribe)
 		switch {
 		case err != nil:
-			backoff = 1000
+			backoff = 100
 		case !processed:
 			backoff = 1000
 		default:
 			backoff = 0
 		}
 	}
-
-	return nil
 }
 
 func (s *PostgresEventStore) run(ctx context.Context, subscribe func(bus.Event) error) (error, bool) {
@@ -269,7 +290,7 @@ func (s *PostgresEventStore) run(ctx context.Context, subscribe func(bus.Event) 
 		tx.Rollback()
 		return log.Error(ctx, "error when subscribing event", log.F{"error": err.Error()}), false
 	}
-	if s.closed {
+	if s.closed || ctx.Err() != nil {
 		tx.Rollback()
 		return log.Error(ctx, "event store closed mid subscribe, discarding", log.F{"event": msg.(bus.Event).Event()}), false
 	}

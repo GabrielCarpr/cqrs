@@ -300,7 +300,7 @@ func (s EventStoreBlackboxTest) TestNoEventsDoesntCallBack() {
 }
 
 func (s EventStoreBlackboxTest) TestSubscribesConcurrentlyOnceOnly() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*500)
 	defer cancel()
 
 	for i := 0; i < 100; i++ {
@@ -353,7 +353,7 @@ func (s EventStoreBlackboxTest) TestSubscribesConcurrentlyOnceOnly() {
 }
 
 func (s EventStoreBlackboxTest) TestSubscribeErrorNacks() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*70)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*500)
 	defer cancel()
 
 	for i := 0; i < 3; i++ {
@@ -407,6 +407,7 @@ func (s EventStoreBlackboxTest) TestConcurrentAppends() {
 	close(start)
 	group.Wait()
 
+	s.T().Log(s.entity)
 	s.Equal(99, errors)
 }
 
@@ -452,10 +453,15 @@ func (s EventStoreBlackboxTest) TestCloseDoesntLoseEvents() {
 	}
 
 	results := make(map[int]int)
-	s.store.Subscribe(ctx, func(e bus.Event) error {
-		s.store.Close()
-		return nil
-	})
+	func() {
+		defer func() {
+			recover()
+		}()
+		s.store.Subscribe(ctx, func(e bus.Event) error {
+			//go func() { s.store.Close() }()
+			panic("error")
+		})
+	}()
 
 	if opener, ok := s.store.(interface{ Open() }); ok {
 		opener.Open()
@@ -463,7 +469,7 @@ func (s EventStoreBlackboxTest) TestCloseDoesntLoseEvents() {
 		s.store = s.factory()
 	}
 	if s.changeNow != nil {
-		s.changeNow(time.Now().Add(time.Minute * 2))
+		s.changeNow(time.Now().Add(time.Minute * 3))
 	}
 	err := s.store.Subscribe(ctx, func(e bus.Event) error {
 		results[e.(*TestEvent).Age] += 1
