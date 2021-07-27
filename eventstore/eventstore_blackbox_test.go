@@ -84,13 +84,13 @@ type EventStoreBlackboxTest struct {
 }
 
 func (s *EventStoreBlackboxTest) SetupTest() {
-	log.SetLevel(log.WARN)
 	s.store = s.factory()
 	s.entity = uuid.New()
 	s.buffer = Buffer(s.entity)
 	s.otherBuffer = Buffer(uuid.New())
 	bus.RegisterMessage(&TestEvent{})
 
+	log.SetLevel(log.WARN)
 	if s.setupHook != nil {
 		err := s.setupHook()
 		if err != nil {

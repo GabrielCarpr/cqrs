@@ -39,25 +39,25 @@ func logln(ctx context.Context, lvl string, loc bool, msg string, fields F) {
 }
 
 func Debug(ctx context.Context, msg string, fields F) {
-	if level >= DEBUG {
+	if level <= DEBUG {
 		logln(ctx, "DEBUG", false, msg, fields)
 	}
 }
 
 func Info(ctx context.Context, msg string, fields F) {
-	if level >= INFO {
+	if level <= INFO {
 		logln(ctx, "INFO", false, msg, fields)
 	}
 }
 
 func Warn(ctx context.Context, msg string, fields F) {
-	if level >= WARN {
+	if level <= WARN {
 		logln(ctx, "WARN", true, msg, fields)
 	}
 }
 
 func Error(ctx context.Context, msg interface{}, fields F) error {
-	err := interfaceToError(msg)
+	err := interfaceToError(msg, fields)
 	logln(ctx, "ERROR", true, err.Error(), fields)
 	return err
 }
@@ -68,12 +68,12 @@ func Fatal(msg string, fields F) {
 }
 
 func Panic(ctx context.Context, msg interface{}, fields F) {
-	err := interfaceToError(msg)
+	err := interfaceToError(msg, fields)
 	logln(ctx, "PANIC", true, err.Error(), fields)
 	panic(err)
 }
 
-func interfaceToError(msg interface{}) error {
+func interfaceToError(msg interface{}, fields F) error {
 	var err error
 	switch v := msg.(type) {
 	case string:
@@ -85,5 +85,10 @@ func interfaceToError(msg interface{}) error {
 	default:
 		err = errors.New(fmt.Sprint(v))
 	}
+
+	for key, val := range fields {
+		err = fmt.Errorf("%s: %s: %v", key, val, err)
+	}
+
 	return err
 }
