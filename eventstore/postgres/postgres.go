@@ -5,12 +5,16 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/GabrielCarpr/cqrs/bus"
 	"github.com/GabrielCarpr/cqrs/bus/message"
 	"github.com/GabrielCarpr/cqrs/eventstore"
+	"github.com/GabrielCarpr/cqrs/log"
 	_ "github.com/lib/pq"
 )
+
+var Now = time.Now
 
 func New(c Config) *PostgresEventStore {
 	db := makeDB(c)
@@ -19,7 +23,7 @@ func New(c Config) *PostgresEventStore {
 	if err != nil {
 		panic(err)
 	}
-	return &PostgresEventStore{db}
+	return &PostgresEventStore{db: db}
 }
 
 func makeDB(c Config) *sql.DB {
@@ -165,15 +169,21 @@ func (s *PostgresEventStore) Stream(ctx context.Context, stream bus.Stream, q bu
 }
 
 func (s *PostgresEventStore) Subscribe(ctx context.Context, subscribe func(bus.Event) error) (err error) {
+	backoff := 0
 	for {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || s.closed {
+			log.Info(ctx, "ending postgres event store subscribe loop", log.F{})
 			break
 		}
+		<-time.After(time.Millisecond * time.Duration(backoff))
+		log.Info(ctx, "checking for new events", log.F{})
 
 		var tx *sql.Tx
 		tx, err = s.db.Begin()
 		if err != nil {
-			return
+			log.Error(ctx, "could not open transaction", log.F{"error": err.Error()})
+			backoff = 1000
+			continue
 		}
 
 		claim := `
@@ -182,7 +192,8 @@ func (s *PostgresEventStore) Subscribe(ctx context.Context, subscribe func(bus.E
 		WHERE "offset" = (
 			SELECT "offset"
 			FROM events
-			WHERE reserved_at IS NULL
+			WHERE (reserved_at IS NULL
+				OR (reserved_at < $1 AND acked_at IS NULL))
 			ORDER BY "offset" ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
@@ -190,14 +201,16 @@ func (s *PostgresEventStore) Subscribe(ctx context.Context, subscribe func(bus.E
 		RETURNING "offset"`
 
 		var offset int
-		err1 := tx.QueryRow(claim).Scan(&offset)
+		err1 := tx.QueryRow(claim, Now().Add(-time.Minute)).Scan(&offset)
 		if err1 != nil && err1 != sql.ErrNoRows {
 			err = err1
 			tx.Rollback()
-			return
+			log.Warn(ctx, "Error claiming event", log.F{"error": err1.Error()})
+			continue
 		}
 		if err1 != nil && err1 == sql.ErrNoRows {
 			tx.Rollback()
+			backoff = 1000
 			continue
 		}
 
@@ -205,27 +218,44 @@ func (s *PostgresEventStore) Subscribe(ctx context.Context, subscribe func(bus.E
 		err = tx.QueryRow(`SELECT payload FROM events WHERE "offset" = $1`, offset).Scan(&data)
 		if err != nil {
 			tx.Rollback()
-			return
+			log.Warn(ctx, "could not get event payload", log.F{"error": err.Error()})
+			continue
 		}
 
 		var msg message.Message
 		msg, err = bus.DeserializeMessage(data)
 		if err != nil {
 			tx.Rollback()
-			return
+			log.Warn(ctx, "could not deserialize event message", log.F{"error": err.Error()})
+			continue
 		}
 
 		err = subscribe(msg.(bus.Event))
 		if err != nil {
 			tx.Rollback()
+			log.Info(ctx, "error when subscribing event", log.F{"error": err.Error()})
+			continue
+		}
+		if s.closed {
+			tx.Rollback()
+			log.Info(ctx, "event store closed mid subscribe, discarding", log.F{"event": msg.(bus.Event).Event()})
+		}
+
+		_, err = tx.Exec(`UPDATE events SET acked_at = $1 WHERE "offset" = $2`, Now(), offset)
+		if err != nil {
+			tx.Rollback()
+			log.Warn(ctx, "error marking event as acked", log.F{"error": err.Error()})
 			continue
 		}
 
 		err = tx.Commit()
 		if err != nil {
 			tx.Rollback()
-			return
+			log.Warn(ctx, "error commiting subscribed event", log.F{"error": err.Error()})
+			continue
 		}
+		log.Info(ctx, "processed event subscription", log.F{"event": msg.(bus.Event).Event()})
+		backoff = 0
 	}
 
 	return nil

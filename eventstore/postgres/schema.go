@@ -43,4 +43,9 @@ func (s PostgreSQLSchema) Reset() {
 	if err != nil && !strings.Contains(err.Error(), "does not exist") {
 		panic(err)
 	}
+
+	err = db.Close()
+	if err != nil {
+		panic(err)
+	}
 }

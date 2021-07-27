@@ -5,6 +5,7 @@ package eventstore_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/GabrielCarpr/cqrs/eventstore"
 	"github.com/GabrielCarpr/cqrs/eventstore/memory"
 	"github.com/GabrielCarpr/cqrs/eventstore/postgres"
+	"github.com/GabrielCarpr/cqrs/log"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/sync/errgroup"
@@ -56,6 +58,11 @@ func TestPostgresEventStore(t *testing.T) {
 		schema.Reset()
 		return nil
 	}
+	s.changeNow = func(t time.Time) {
+		postgres.Now = func() time.Time {
+			return t
+		}
+	}
 	suite.Run(t, s)
 }
 
@@ -68,6 +75,7 @@ type EventStoreBlackboxTest struct {
 
 	factory   func() bus.EventStore
 	setupHook func() error
+	changeNow func(time.Time)
 
 	entity      uuid.UUID
 	buffer      bus.EventBuffer
@@ -76,6 +84,7 @@ type EventStoreBlackboxTest struct {
 }
 
 func (s *EventStoreBlackboxTest) SetupTest() {
+	log.SetLevel(log.WARN)
 	s.store = s.factory()
 	s.entity = uuid.New()
 	s.buffer = Buffer(s.entity)
@@ -91,7 +100,10 @@ func (s *EventStoreBlackboxTest) SetupTest() {
 }
 
 func (s *EventStoreBlackboxTest) TearDownTest() {
-	s.store.Close()
+	err := s.store.Close()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (s EventStoreBlackboxTest) TestAppendsEventsAndStreams() {
@@ -367,13 +379,14 @@ func (s EventStoreBlackboxTest) TestSubscribeErrorNacks() {
 }
 
 func (s EventStoreBlackboxTest) TestConcurrentAppends() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*500)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*3000)
 	defer cancel()
 
 	s.buffer.Buffer(true, &TestEvent{Name: "Gabriel"})
 	event := s.buffer.Events(context.Background())[0]
 
 	start := make(chan struct{})
+	m := sync.Mutex{}
 	group, ctx := errgroup.WithContext(ctx)
 	errors := 0
 	for i := 0; i < 100; i++ {
@@ -383,7 +396,9 @@ func (s EventStoreBlackboxTest) TestConcurrentAppends() {
 			err := s.store.Append(ctx, bus.ExpectedVersion(0), event)
 			if err != nil {
 				s.Require().EqualError(err, eventstore.ErrConcurrencyViolation.Error(), "Error'd on: %d", i)
+				m.Lock()
 				errors++
+				m.Unlock()
 			}
 			return nil
 		})
@@ -425,7 +440,7 @@ func (s EventStoreBlackboxTest) TestSubscribesInOrder() {
 }
 
 func (s EventStoreBlackboxTest) TestCloseDoesntLoseEvents() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*600)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*800)
 	defer cancel()
 
 	for i := 0; i < 3; i++ {
@@ -447,6 +462,9 @@ func (s EventStoreBlackboxTest) TestCloseDoesntLoseEvents() {
 	} else {
 		s.store = s.factory()
 	}
+	if s.changeNow != nil {
+		s.changeNow(time.Now().Add(time.Minute * 2))
+	}
 	err := s.store.Subscribe(ctx, func(e bus.Event) error {
 		results[e.(*TestEvent).Age] += 1
 		return nil
@@ -457,5 +475,3 @@ func (s EventStoreBlackboxTest) TestCloseDoesntLoseEvents() {
 	s.GreaterOrEqual(results[26], 1)
 	s.GreaterOrEqual(results[27], 1)
 }
-
-// Add another test to test postgres not acking, and timing out reserved
