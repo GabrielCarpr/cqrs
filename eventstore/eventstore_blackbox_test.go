@@ -440,8 +440,8 @@ func (s EventStoreBlackboxTest) TestSubscribesInOrder() {
 	}
 }
 
-func (s EventStoreBlackboxTest) TestCloseDoesntLoseEvents() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*800)
+func (s EventStoreBlackboxTest) TestHandlesPanic() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*400)
 	defer cancel()
 
 	for i := 0; i < 3; i++ {
@@ -453,24 +453,12 @@ func (s EventStoreBlackboxTest) TestCloseDoesntLoseEvents() {
 	}
 
 	results := make(map[int]int)
-	func() {
-		defer func() {
-			recover()
-		}()
-		s.store.Subscribe(ctx, func(e bus.Event) error {
-			//go func() { s.store.Close() }()
-			panic("error")
-		})
-	}()
+	s.store.Subscribe(ctx, func(e bus.Event) error {
+		panic("error")
+	})
 
-	if opener, ok := s.store.(interface{ Open() }); ok {
-		opener.Open()
-	} else {
-		s.store = s.factory()
-	}
-	if s.changeNow != nil {
-		s.changeNow(time.Now().Add(time.Minute * 3))
-	}
+	ctx, cancel = context.WithTimeout(context.Background(), time.Millisecond*400)
+	defer cancel()
 	err := s.store.Subscribe(ctx, func(e bus.Event) error {
 		results[e.(*TestEvent).Age] += 1
 		return nil
@@ -481,3 +469,6 @@ func (s EventStoreBlackboxTest) TestCloseDoesntLoseEvents() {
 	s.GreaterOrEqual(results[26], 1)
 	s.GreaterOrEqual(results[27], 1)
 }
+
+// TODO: Add further test to simulate crashing of
+// subscribe callback: https://stackoverflow.com/questions/26225513/how-to-test-os-exit-scenarios-in-go

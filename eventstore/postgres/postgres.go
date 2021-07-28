@@ -285,14 +285,24 @@ func (s *PostgresEventStore) run(ctx context.Context, subscribe func(bus.Event) 
 		return log.Error(ctx, "could not deserialize event message", log.F{"error": err.Error()}), false
 	}
 
-	err = subscribe(msg.(bus.Event))
+	err = func() (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err = log.Error(ctx, "panicked subscribing", log.F{"panic": fmt.Sprint(r)})
+			}
+		}()
+		err = subscribe(msg.(bus.Event))
+		if err != nil {
+			return log.Error(ctx, "error when subscribing event", log.F{"error": err.Error()})
+		}
+		if s.closed || ctx.Err() != nil {
+			return log.Error(ctx, "event store closed mid subscribe, discarding", log.F{"event": msg.(bus.Event).Event()})
+		}
+		return nil
+	}()
 	if err != nil {
 		tx.Rollback()
-		return log.Error(ctx, "error when subscribing event", log.F{"error": err.Error()}), false
-	}
-	if s.closed || ctx.Err() != nil {
-		tx.Rollback()
-		return log.Error(ctx, "event store closed mid subscribe, discarding", log.F{"event": msg.(bus.Event).Event()}), false
+		return err, false
 	}
 
 	_, err = tx.Exec(`UPDATE events SET acked_at = $1 WHERE "offset" = $2`, Now(), offset)

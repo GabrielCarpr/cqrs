@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -91,11 +92,19 @@ func (s *MemoryEventStore) Subscribe(ctx context.Context, subscription func(bus.
 				if len(s.events) == s.offset {
 					return nil // Up to date
 				}
-				res := subscription(s.events[s.offset])
-				if res != nil {
+				err := func() (err error) {
+					defer func() {
+						if r := recover(); r != nil {
+							err = fmt.Errorf("panicked: %s", r)
+						}
+					}()
+					err = subscription(s.events[s.offset])
+					return
+				}()
+				if err != nil {
 					errs++
 					if errs > 4 {
-						return res // There were 5 errors and retrying didn't work
+						return err // There were 5 errors and retrying didn't work
 					}
 					return nil // There was an error but we can retry
 				}
