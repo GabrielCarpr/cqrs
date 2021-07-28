@@ -3,12 +3,12 @@ package bus
 import (
 	"context"
 	"github.com/GabrielCarpr/cqrs/bus/message"
+	"github.com/GabrielCarpr/cqrs/errors"
 	"github.com/GabrielCarpr/cqrs/log"
 )
 
 /*
 * TODO: Add new middleware
-* - External error checking and hiding
 * - Panic recovery
 * - Auth/access control guard
 
@@ -108,5 +108,37 @@ func QueryLoggingMiddleware(next QueryHandler) QueryHandler {
 		defer log.Info(ctx, "Finished executing query", log.F{"query": q.Query()})
 
 		return next.Execute(ctx, q, res)
+	})
+}
+
+func CommandErrorMiddleware(next CommandHandler) CommandHandler {
+	return CmdMiddlewareFunc(func(ctx context.Context, c Command) (CommandResponse, []message.Message) {
+		res, msgs := next.Execute(ctx, c)
+		if res.Error == nil {
+			return res, msgs
+		}
+		if _, ok := res.Error.(errors.Error); ok {
+			return res, msgs
+		}
+
+		log.Error(ctx, res.Error, log.F{})
+		res.Error = errors.InternalServerError
+		return res, msgs
+	})
+}
+
+// QueryErrorMiddleware blocks internal errors from escaping query interfaces
+func QueryErrorMiddleware(next QueryHandler) QueryHandler {
+	return QueryMiddlewareFunc(func(ctx context.Context, q Query, res interface{}) error {
+		err := next.Execute(ctx, q, res)
+		if err == nil {
+			return err
+		}
+		if err, ok := err.(errors.Error); ok {
+			return err
+		}
+
+		log.Error(ctx, err, log.F{})
+		return errors.InternalServerError
 	})
 }

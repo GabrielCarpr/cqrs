@@ -6,6 +6,8 @@ import (
 
 type ExpectedVersion int64
 
+var Any ExpectedVersion = -1
+
 type Stream = chan<- Event
 
 type EventStore interface {

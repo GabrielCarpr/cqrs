@@ -162,8 +162,8 @@ func NewEventBuffer(owner fmt.Stringer, t string) EventBuffer {
 type EventBuffer struct {
 	owner   fmt.Stringer
 	events  []Event
-	Version int64 `json:"version"`
-	Type    string
+	Version int64  `json:"-"`
+	Type    string `json:"-"`
 }
 
 // JSONMarshal implements encoding/json.Marshaler

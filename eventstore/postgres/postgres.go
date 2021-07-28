@@ -89,15 +89,16 @@ func (s *PostgresEventStore) Append(ctx context.Context, v bus.ExpectedVersion, 
 		data, err := bus.SerializeMessage(event, bus.Json)
 		if err != nil {
 			tx.Rollback()
-			return err
+			return log.Error(ctx, "failed serializing event", log.F{"err": err.Error()})
 		}
-		_, err = tx.Exec(`INSERT INTO events (owner, type, at, version, payload)
-			VALUES ($1, $2, $3, $4, $5)`,
+		_, err = tx.Exec(`INSERT INTO events (owner, type, at, version, payload, "unique")
+			VALUES ($1, $2, $3, $4, $5, $6)`,
 			event.Owned(),
 			event.FromAggregate(),
 			event.WasPublishedAt(),
 			event.Versioned(),
 			data,
+			v != bus.Any,
 		)
 		switch {
 		case err != nil && strings.Contains(err.Error(), "unique constraint"):

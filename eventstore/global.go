@@ -31,6 +31,9 @@ func CheckEventsConsistent(events ...bus.Event) error {
 // CheckExpectedVersion performs optimistic locking to prevent concurrent
 // writes of the same stream
 func CheckExpectedVersion(lastEvent bus.Event, v bus.ExpectedVersion) error {
+	if v == bus.Any {
+		return nil
+	}
 	if lastEvent != nil && lastEvent.Versioned() != int64(v) {
 		return ErrConcurrencyViolation
 	}

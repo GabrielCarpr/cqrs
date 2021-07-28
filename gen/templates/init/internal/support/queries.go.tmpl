@@ -29,8 +29,8 @@ type Order string
 
 type Paging struct {
 	Page    *int
-	PerPage *int
-	SortBy  *string
+	PerPage *int `cqrs:"per_page"`
+	SortBy  *string `cqrs:"sort_by"`
 	Order   *Order
 }
 

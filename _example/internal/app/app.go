@@ -3,7 +3,6 @@ package app
 import (
 	"example/internal/config"
 	"github.com/GabrielCarpr/cqrs/auth"
-	"github.com/GabrielCarpr/cqrs/errors"
 	"github.com/GabrielCarpr/cqrs/bus"
 	"github.com/GabrielCarpr/cqrs/log"
 	"github.com/GabrielCarpr/cqrs/bus/queue/sql"
@@ -58,8 +57,6 @@ func Make(ctx context.Context) *App {
 	b.Use(
 		auth.CommandAuthGuard,
 		auth.QueryAuthGuard,
-		errors.CommandErrorMiddleware,
-		errors.QueryErrorMiddleware,
 	)
 	bus.RegisterContextKey(auth.AuthCtxKey, auth.Credentials{})
 	bus.RegisterContextKey(log.CtxIDKey, uuid.New())

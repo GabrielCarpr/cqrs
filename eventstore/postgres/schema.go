@@ -27,8 +27,16 @@ func (s PostgreSQLSchema) Make() error {
 		"payload" JSON NOT NULL,
 		"reserved_at" TIMESTAMP DEFAULT NULL,
 		"acked_at" TIMESTAMP DEFAULT NULL,
-		UNIQUE("type", "owner", "version")
+		"unique" BOOLEAN DEFAULT TRUE
 	);`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS
+		events_unique_stream_version
+		ON events ("type", "owner", "version")
+		WHERE ("unique" is NOT null)
+	`)
 
 	return err
 }

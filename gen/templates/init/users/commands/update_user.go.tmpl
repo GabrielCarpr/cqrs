@@ -54,7 +54,7 @@ type UpdateUserHandler struct {
 	roles db.RoleRepository
 }
 
-func (h UpdateUserHandler) Execute(ctx context.Context, c bus.Command) (res bus.CommandResponse, _ []message.Message) {
+func (h UpdateUserHandler) Execute(ctx context.Context, c bus.Command) (res bus.CommandResponse, msgs []message.Message) {
 	cmd := c.(UpdateUser)
 
 	user, err := h.getUser(cmd.ID)
@@ -74,10 +74,13 @@ func (h UpdateUserHandler) Execute(ctx context.Context, c bus.Command) (res bus.
 		return
 	}
 
+	events := user.Messages(ctx)
+	user.Commit()
 	err = h.users.Persist(user)
 	switch err {
 	case nil:
 		res = bus.CommandResponse{ID: user.ID.String()}
+		msgs = append(msgs, events...)
 		return
 	default:
 		res = bus.CommandResponse{Error: err}

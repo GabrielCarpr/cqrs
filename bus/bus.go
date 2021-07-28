@@ -25,6 +25,8 @@ func Default(ctx context.Context, mods []Module, configs ...Config) *Bus {
 		QueryValidationGuard,
 		CommandLoggingMiddleware,
 		QueryLoggingMiddleware,
+		CommandErrorMiddleware,
+		QueryErrorMiddleware,
 	)
 	return b
 }
@@ -171,7 +173,6 @@ func (b *Bus) ExtendEvents(rules ...EventRules) *Bus {
 		for event := range rule {
 			stdlog.Printf("Registered event: %s", event.Event())
 			RegisterMessage(event)
-			RegisterMessage(event)
 		}
 	}
 	return b
@@ -296,6 +297,19 @@ func (b *Bus) runCmdGuards(ctx context.Context, cmd Command) (context.Context, C
 
 // Publish distributes one or more events to the system
 func (b *Bus) Publish(ctx context.Context, events ...Event) error {
+	if b.eventStore != nil {
+		log.Info(ctx, "publishing events to queue", log.F{"count": fmt.Sprint(len(events))})
+		err := b.eventStore.Append(ctx, Any, events...)
+		if err != nil {
+			return log.Error(ctx, "failed publishing events to event store", log.F{"err": err.Error()})
+		}
+	}
+
+	log.Info(ctx, "publishing events to store", log.F{"count": fmt.Sprint(len(events))})
+	return b.publish(ctx, events...)
+}
+
+func (b *Bus) publish(ctx context.Context, events ...Event) error {
 	var queueables []queuedEvent
 	for _, event := range events {
 		handlerNames := b.routes.RouteEvent(event)

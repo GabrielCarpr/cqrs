@@ -27,6 +27,10 @@ func (r RoleID) MarshalJSON() ([]byte, error) {
 	return json.Marshal(r.Name)
 }
 
+func (r *RoleID) UnmarshalJSON(data []byte) error {
+	return json.Unmarshal(data, &r.Name)
+}
+
 func (r RoleID) Value() (driver.Value, error) {
 	return r.Name, nil
 }
