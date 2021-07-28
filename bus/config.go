@@ -9,3 +9,11 @@ func UseQueue(q Queue) Config {
 		return nil
 	}
 }
+
+// UseEventStore provides an instantiated event store for the bus to use
+func UseEventStore(s EventStore) Config {
+	return func(b *Bus) error {
+		b.eventStore = s
+		return nil
+	}
+}

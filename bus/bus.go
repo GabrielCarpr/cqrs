@@ -81,11 +81,12 @@ func New(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 // messages and routes them to the correct place either synchronously
 // or asynchronously
 type Bus struct {
-	routes    MessageRouter
-	container di.Container
-	queue     Queue
-	ctx       context.Context
-	ctxCancel context.CancelFunc
+	routes     MessageRouter
+	container  di.Container
+	queue      Queue
+	eventStore EventStore
+	ctx        context.Context
+	ctxCancel  context.CancelFunc
 
 	commandGuards     []CommandGuard
 	queryGuards       []QueryGuard
@@ -115,6 +116,7 @@ func (b *Bus) Work() {
 	group, ctx := errgroup.WithContext(b.ctx)
 
 	for _, plugin := range b.plugins {
+		plugin := plugin
 		group.Go(func() error {
 			err := plugin.Work(ctx)
 			return err

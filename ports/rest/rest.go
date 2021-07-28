@@ -2,7 +2,9 @@ package rest
 
 import (
 	"context"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/GabrielCarpr/cqrs/auth"
 	"github.com/GabrielCarpr/cqrs/bus"
@@ -37,7 +39,27 @@ func (s *Server) Map(method string, route string, handler func(*bus.Bus) gin.Han
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	return s.Router.Run()
+	srv := &http.Server{
+		Addr:    ":80",
+		Handler: s.Router,
+	}
+
+	errord := make(chan struct{})
+	var err error
+	go func() {
+		if err = srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			close(errord)
+		}
+	}()
+
+	select {
+	case <-errord:
+		return err
+	case <-ctx.Done():
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+		return srv.Shutdown(ctx)
+	}
 }
 
 func (s *Server) Auth() gin.HandlerFunc {
