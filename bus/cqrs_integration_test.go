@@ -179,7 +179,7 @@ func TestBusHandlesEvent(t *testing.T) {
 	assert.Equal(t, "Hello world", syncResult)
 	assert.Empty(t, asyncResult)
 
-	b.Work()
+	b.Run()
 	assert.Equal(t, "Hello world", asyncResult)
 }
 
@@ -242,7 +242,7 @@ func TestBusQueueCommand(t *testing.T) {
 	assert.Nil(t, res)
 
 	defer cancel()
-	b.Work()
+	b.Run()
 
 	assert.Equal(t, "hello", result)
 }
