@@ -10,7 +10,7 @@ import (
 
 	"github.com/GabrielCarpr/cqrs/bus/message"
 	"github.com/GabrielCarpr/cqrs/log"
-	"golang.org/x/sync/errgroup"
+	"github.com/GabrielCarpr/cqrs/ports"
 
 	"github.com/sarulabs/di/v2"
 )
@@ -114,30 +114,30 @@ func (b *Bus) Close() {
 
 // Work runs the bus in subscribe mode, to be ran as on a worker
 // node, or in the background on an API server
-func (b *Bus) Work() {
-	group, ctx := errgroup.WithContext(b.ctx)
-
-	for _, plugin := range b.plugins {
-		plugin := plugin
-		group.Go(func() error {
-			err := plugin.Work(ctx)
-			return err
-		})
-	}
-
-	group.Go(func() error {
-		// The queue blocks. The ctx will signal cancellation, and then it will unblock
-		b.queue.Subscribe(b.ctx, func(ctx context.Context, msg message.Message) error {
-			return b.routeFromQueue(ctx, msg)
-		})
+func (b *Bus) Run() error {
+	ps := ports.Ports{}
+	ps = ps.PortFunc(func(c context.Context) error {
+		b.queue.Subscribe(c, b.routeFromQueue)
 		return nil
 	})
-
-	if err := group.Wait(); err != nil {
-		b.Close()
-		panic(err)
+	if b.eventStore != nil {
+		ps = ps.PortFunc(func(c context.Context) error {
+			return b.eventStore.Subscribe(c, func(e Event) error {
+				return b.publish(context.Background(), e)
+			})
+		})
 	}
+
+	for _, plugin := range b.plugins {
+		ps = ps.Append(plugin)
+	}
+
+	if err := ps.Run(b.ctx); err != nil {
+		return err
+	}
+
 	b.Close()
+	return nil
 }
 
 // Get returns an (unscoped) service from the container
@@ -158,11 +158,7 @@ func (b *Bus) Get(key interface{}) interface{} {
 func (b *Bus) RegisterPlugins(plugins ...Plugin) {
 	for _, plugin := range plugins {
 		b.plugins = append(b.plugins, plugin)
-		b.Use(plugin.Middleware()...)
-		plugin.Attach(func(ctx context.Context, c Command) error {
-			_, err := b.Dispatch(ctx, c, false)
-			return err
-		})
+		plugin.Register(b)
 	}
 }
 
@@ -310,6 +306,7 @@ func (b *Bus) Publish(ctx context.Context, events ...Event) error {
 }
 
 func (b *Bus) publish(ctx context.Context, events ...Event) error {
+	log.Info(ctx, "fanning out events", log.F{"count": fmt.Sprint(len(events)), "first": events[0].Event()})
 	var queueables []queuedEvent
 	for _, event := range events {
 		handlerNames := b.routes.RouteEvent(event)

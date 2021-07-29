@@ -27,6 +27,23 @@ type Port interface {
 // Ports is a collection of entry ports into the system
 type Ports []Port
 
+type portRunner struct {
+	runFunc func(context.Context) error
+}
+
+func (r portRunner) Run(ctx context.Context) error {
+	return r.runFunc(ctx)
+}
+
+func (p Ports) PortFunc(fn func(context.Context) error) Ports {
+	pt := portRunner{fn}
+	return append(p, pt)
+}
+
+func (p Ports) Append(port Port) Ports {
+	return append(p, port)
+}
+
 // Run runs all the ports with graceful shutdown.
 //
 // Run will block, running all the ports concurrently, until receiving an ctx cancellation,

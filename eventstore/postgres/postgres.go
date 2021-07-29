@@ -227,7 +227,6 @@ func (s *PostgresEventStore) Subscribe(ctx context.Context, subscribe func(bus.E
 			break
 		}
 
-		log.Info(ctx, "checking for new events", log.F{})
 		err, processed := s.run(ctx, subscribe)
 		switch {
 		case err != nil:

@@ -13,7 +13,6 @@ import (
 	"context"
 	//"fmt"
 	"github.com/google/uuid"
-	stdlog "log"
 	"os/signal"
 	"os"
 
@@ -76,12 +75,14 @@ func (a *App) Handle() {
 
 	err := p.Run(a.ctx)
 	if err != nil {
-		stdlog.Fatal(err)
+		panic(err)
 	}
 }
 
 func (a *App) Work() {
-	a.Bus.Work()
+	if err := a.Bus.Run(); err != nil {
+		panic(err)
+	}
 }
 
 func (a *App) Delete() {

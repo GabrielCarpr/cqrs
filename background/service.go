@@ -72,18 +72,26 @@ var _ bus.Plugin = (*Service)(nil)
 type Service struct {
 	ctn    di.Container
 	cancel context.CancelFunc
+	b      *bus.Bus
 }
 
 func (s *Service) Controller() *Controller {
 	return s.ctn.Get("controller").(*Controller)
 }
 
-func (s *Service) Attach(qa queueAction) {
-	s.Controller().RegisterQueueAction(qa)
+func (s *Service) Register(b *bus.Bus) error {
+	s.b = b
+	s.Controller().RegisterQueueAction(func(ctx context.Context, cmd bus.Command) error {
+		_, err := s.b.Dispatch(ctx, cmd, false)
+		return err
+	})
+	s.b.Use(s.Controller().JobFinishingMiddleware)
+
+	return nil
 }
 
-// Work blocks until the context cancels, or the worker exits
-func (s *Service) Work(ctx context.Context) error {
+// Run blocks until the context cancels, or the worker exits
+func (s *Service) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 	return s.Controller().Run(ctx)
@@ -98,8 +106,4 @@ func (s *Service) Close() error {
 	s.cancel()
 	s.ctn.Delete()
 	return nil
-}
-
-func (s *Service) Middleware() []interface{} {
-	return []interface{}{s.Controller().JobFinishingMiddleware}
 }
