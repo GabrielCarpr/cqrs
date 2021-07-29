@@ -1,4 +1,4 @@
-// +build !unitsd
+// +build !unit
 
 package eventstore_test
 

@@ -2,6 +2,8 @@ package bus
 
 import (
 	"context"
+	"reflect"
+
 	"github.com/GabrielCarpr/cqrs/bus/message"
 	"github.com/GabrielCarpr/cqrs/errors"
 	"github.com/GabrielCarpr/cqrs/log"
@@ -78,6 +80,23 @@ func CommandLoggingMiddleware(next CommandHandler) CommandHandler {
 	})
 }
 
+// CommandErrorMiddleware stops internal errors from being exposed to ports
+func CommandErrorMiddleware(next CommandHandler) CommandHandler {
+	return CmdMiddlewareFunc(func(ctx context.Context, c Command) (CommandResponse, []message.Message) {
+		res, msgs := next.Execute(ctx, c)
+		if res.Error == nil {
+			return res, msgs
+		}
+		if _, ok := res.Error.(errors.Error); ok {
+			return res, msgs
+		}
+
+		log.Error(ctx, res.Error, log.F{})
+		res.Error = errors.InternalServerError
+		return res, msgs
+	})
+}
+
 /*
  * Query middleware
  * TODO: Add tests
@@ -111,22 +130,6 @@ func QueryLoggingMiddleware(next QueryHandler) QueryHandler {
 	})
 }
 
-func CommandErrorMiddleware(next CommandHandler) CommandHandler {
-	return CmdMiddlewareFunc(func(ctx context.Context, c Command) (CommandResponse, []message.Message) {
-		res, msgs := next.Execute(ctx, c)
-		if res.Error == nil {
-			return res, msgs
-		}
-		if _, ok := res.Error.(errors.Error); ok {
-			return res, msgs
-		}
-
-		log.Error(ctx, res.Error, log.F{})
-		res.Error = errors.InternalServerError
-		return res, msgs
-	})
-}
-
 // QueryErrorMiddleware blocks internal errors from escaping query interfaces
 func QueryErrorMiddleware(next QueryHandler) QueryHandler {
 	return QueryMiddlewareFunc(func(ctx context.Context, q Query, res interface{}) error {
@@ -140,5 +143,37 @@ func QueryErrorMiddleware(next QueryHandler) QueryHandler {
 
 		log.Error(ctx, err, log.F{})
 		return errors.InternalServerError
+	})
+}
+
+/**
+* Event Middleware
+ */
+
+// EventMiddleware allows extending handlers with decoration
+type EventMiddleware = func(EventHandler) EventHandler
+
+type baseEventMiddleware struct {
+	handleMethod func(context.Context, Event) ([]message.Message, error)
+}
+
+func (m baseEventMiddleware) Handle(ctx context.Context, e Event) ([]message.Message, error) {
+	return m.handleMethod(ctx, e)
+}
+
+// EventHandlerFunc constructs a by taking a function
+func EventHandlerFunc(fn func(ctx context.Context, e Event) ([]message.Message, error)) EventHandler {
+	handler := baseEventMiddleware{}
+	handler.handleMethod = fn
+	return handler
+}
+
+// EventLoggingMiddleware logs handling of events
+func EventLoggingMiddleware(next EventHandler) EventHandler {
+	return EventHandlerFunc(func(ctx context.Context, e Event) ([]message.Message, error) {
+		log.Info(ctx, "executing event handler", log.F{"event": e.Event(), "handler": reflect.TypeOf(next).String()})
+		msgs, err := next.Handle(ctx, e)
+		log.Info(ctx, "finished executing event handler", log.F{"event": e.Event(), "handler": reflect.TypeOf(next).String()})
+		return msgs, err
 	})
 }

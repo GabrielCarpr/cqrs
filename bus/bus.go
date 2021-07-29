@@ -27,6 +27,7 @@ func Default(ctx context.Context, mods []Module, configs ...Config) *Bus {
 		QueryLoggingMiddleware,
 		CommandErrorMiddleware,
 		QueryErrorMiddleware,
+		EventLoggingMiddleware,
 	)
 	return b
 }
@@ -94,6 +95,7 @@ type Bus struct {
 	queryGuards       []QueryGuard
 	commandMiddleware []CommandMiddleware
 	queryMiddleware   []QueryMiddleware
+	eventMiddleware   []EventMiddleware
 
 	plugins []Plugin
 }
@@ -198,6 +200,8 @@ func (b *Bus) Use(ms ...interface{}) {
 		case QueryMiddleware:
 			b.queryMiddleware = append(b.queryMiddleware, v)
 			break
+		case EventMiddleware:
+			b.eventMiddleware = append(b.eventMiddleware, v)
 		default:
 			panic(fmt.Sprint("Not a valid middleware, is ", reflect.TypeOf(v)))
 		}
@@ -266,6 +270,9 @@ func (b *Bus) Dispatch(ctx context.Context, cmd Command, sync bool) (*CommandRes
 
 	handler := Get(ctx, handlerName).(CommandHandler)
 	for _, mw := range b.commandMiddleware {
+		handler = mw(handler)
+	}
+	for _, mw := range route.Middleware {
 		handler = mw(handler)
 	}
 
@@ -352,6 +359,10 @@ func (b *Bus) Query(ctx context.Context, query Query, result interface{}) error 
 	for _, mw := range b.queryMiddleware {
 		handler = mw(handler)
 	}
+	for _, mw := range route.Middleware {
+		handler = mw(handler)
+	}
+
 	return handler.Execute(ctx, query, result)
 }
 
@@ -367,14 +378,19 @@ func (b *Bus) runQueryGuards(ctx context.Context, q Query) (context.Context, Que
 }
 
 // handleEvent handles a queued event
-func (b *Bus) handleEvent(ctx context.Context, e queuedEvent, allowAsync bool) ([]message.Message, error) {
+func (b *Bus) handleEvent(ctx context.Context, e queuedEvent, async bool) ([]message.Message, error) {
 	handler := b.container.Get(e.Handler).(EventHandler)
-	if allowAsync && handler.Async() {
+	if async {
 		log.Info(ctx, "Queuing event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(e.Handler).String()})
 		err := b.queue.Publish(ctx, e)
 		return []message.Message{}, err
 	}
 	log.Info(ctx, "Handling event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(handler).String()})
+
+	for _, mw := range b.eventMiddleware {
+		handler = mw(handler)
+	}
+
 	return handler.Handle(ctx, e.Event)
 }
 

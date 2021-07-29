@@ -136,15 +136,6 @@ func (e EventType) FromAggregate() string {
 // Each event may have multiple, or 0, EventHandlers.
 type EventHandler interface {
 	Handle(context.Context, Event) ([]message.Message, error)
-	Async() bool
-}
-
-// Versionable is an entity that can be versioned with events
-type Versionable interface {
-	CurrentVersion() int64
-	PendingVersion() int64
-	Commit() []message.Message
-	ApplyChange(bool, ...Event)
 }
 
 // Event Queue
