@@ -58,6 +58,10 @@ func (otherTestEventHandler) Handle(context.Context, Event) ([]message.Message, 
 	return []message.Message{}, nil
 }
 
+func testEventMiddleware(h EventHandler) EventHandler {
+	return h
+}
+
 func TestEventBuilder(t *testing.T) {
 	suite.Run(t, new(EventBuilderSuite))
 }
@@ -78,41 +82,52 @@ func (s *EventBuilderSuite) SetupTest() {
 func (s *EventBuilderSuite) TestRoutesEventToHandler() {
 	s.b.Event(&testEvent{}).Handled(testEventHandler{})
 
-	route, ok := s.c.Route(&testEvent{})
-	s.Require().True(ok)
+	route := s.c.Route(&testEvent{})
 	s.Equal(route.event.Event(), "test.event")
 	s.Len(route.handlers, 1)
 	s.Equal(route.handlers[0].handler, testEventHandler{})
 
-	_, ok = s.c.Route(&otherTestEvent{})
-	s.False(ok)
+	_ = s.c.Route(&otherTestEvent{})
 }
 
 func (s *EventBuilderSuite) TestRoutesEventsToHandlers() {
 	s.b.Event(&testEvent{}, &otherTestEvent{}).Handled(testEventHandler{}, otherTestEventHandler{})
+	s.b.Use(testEventMiddleware)
 
-	route, ok := s.c.Route(&otherTestEvent{})
-	s.Require().True(ok)
+	route := s.c.Route(&otherTestEvent{})
 	s.Equal(route.event.Event(), "test.event.other")
 	s.Len(route.handlers, 2)
 	s.Equal(route.handlers[0].handler, testEventHandler{})
 	s.Equal(route.handlers[1].handler, otherTestEventHandler{})
+	s.Len(route.handlers[0].middleware, 1)
+	s.Len(route.handlers[1].middleware, 1)
 
-	route, ok = s.c.Route(&testEvent{})
-	s.Require().True(ok)
+	route = s.c.Route(&testEvent{})
 	s.Equal(route.event.Event(), "test.event")
 	s.Len(route.handlers, 2)
 	s.Equal(route.handlers[0].handler, testEventHandler{})
 	s.Equal(route.handlers[1].handler, otherTestEventHandler{})
+	s.Len(route.handlers[0].middleware, 1)
+	s.Len(route.handlers[1].middleware, 1)
 }
 
 func (s *EventBuilderSuite) TestRoutesEventToHandlers() {
 	s.b.Event(&testEvent{}).Handled(testEventHandler{}, otherTestEventHandler{})
 
-	route, ok := s.c.Route(&testEvent{})
-	s.Require().True(ok)
+	route := s.c.Route(&testEvent{})
 	s.Equal(route.event.Event(), "test.event")
 	s.Len(route.handlers, 2)
+}
+
+func (s *EventBuilderSuite) TestAdjacentRoutesIsolated() {
+	s.b.Event(&testEvent{}).Handled(testEventHandler{})
+	s.b.Event(&otherTestEvent{}).Handled(otherTestEventHandler{})
+
+	route := s.c.Route(&testEvent{})
+	s.Len(route.handlers, 1)
+
+	route = s.c.Route(&otherTestEvent{})
+	s.Len(route.handlers, 1)
 }
 
 func (s *EventBuilderSuite) TestHandlerListens() {
@@ -121,15 +136,48 @@ func (s *EventBuilderSuite) TestHandlerListens() {
 		otherTestEventHandler{},
 	).Listens(&testEvent{}, &otherTestEvent{})
 
-	route, ok := s.c.Route(&testEvent{})
-	s.Require().True(ok)
+	route := s.c.Route(&testEvent{})
 	s.Equal(route.event.Event(), "test.event")
 	s.Len(route.handlers, 2)
 	s.Equal(route.handlers[0].handler, testEventHandler{})
 
-	route, ok = s.c.Route(&otherTestEvent{})
-	s.Require().True(ok)
+	route = s.c.Route(&otherTestEvent{})
 	s.Equal(route.event.Event(), "test.event.other")
 	s.Len(route.handlers, 2)
 	s.Equal(route.handlers[1].handler, otherTestEventHandler{})
+}
+
+func (s *EventBuilderSuite) TestWithMiddleware() {
+	s.b.Event(&otherTestEvent{}).Handled(otherTestEventHandler{})
+	s.b.With(testEventMiddleware).Event(&testEvent{}).Handled(testEventHandler{})
+	s.b.Use(testEventMiddleware)
+
+	route := s.c.Route(&testEvent{})
+	s.Equal(route.event.Event(), "test.event")
+	s.Len(route.handlers, 1)
+	s.Len(route.handlers[0].middleware, 2)
+
+	route = s.c.Route(&otherTestEvent{})
+	s.Equal(route.event.Event(), "test.event.other")
+	s.Len(route.handlers, 1)
+	s.Len(route.handlers[0].middleware, 1)
+}
+
+func (s *EventBuilderSuite) TestGroupMiddleware() {
+	s.b.Use(testEventMiddleware)
+	s.b.Event(&otherTestEvent{}).Handled(testEventHandler{}, otherTestEventHandler{})
+	s.b.Group(func(b EventBuilder) {
+		b.With(testEventMiddleware).Handler(testEventHandler{}).Listens(&testEvent{})
+		b.Use(testEventMiddleware)
+	})
+	s.b.Use(testEventMiddleware)
+
+	route := s.c.Route(&otherTestEvent{})
+	s.Equal(route.event.Event(), "test.event.other")
+	s.Len(route.handlers, 2)
+	s.Len(route.handlers[0].middleware, 2)
+
+	route = s.c.Route(&testEvent{})
+	s.Len(route.handlers, 1)
+	s.Len(route.handlers[0].middleware, 4)
 }

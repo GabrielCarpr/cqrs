@@ -4,7 +4,7 @@ package bus
 
 type EventBuilder interface {
 	eventBuilderRouteStarter
-	//eventBuilderMiddleware
+	eventBuilderMiddleware
 }
 
 type eventBuilderRouteStarter interface {
@@ -29,7 +29,7 @@ type eventBuilderListener interface {
 }
 
 type eventBuilderMiddleware interface {
-	Use(EventMiddleware)
+	Use(...EventMiddleware)
 	With(...EventMiddleware) eventBuilderRouteStarter
 	Group(func(EventBuilder))
 }
@@ -41,6 +41,15 @@ type eventRoute struct {
 	handlers []eventHandlerRoute
 }
 
+func (e eventRoute) Merge(r eventRoute) eventRoute {
+	if e.event.Event() != r.event.Event() {
+		panic("tried to merge different events")
+	}
+
+	e.handlers = append(e.handlers, r.handlers...)
+	return e
+}
+
 type eventHandlerRoute struct {
 	handler    EventHandler
 	middleware []EventMiddleware
@@ -49,42 +58,79 @@ type eventHandlerRoute struct {
 var _ EventBuilder = (*eventContext)(nil)
 
 type eventContext struct {
-	events   []Event
-	handlers []EventHandler
+	events     []Event
+	handlers   []EventHandler
+	middleware []EventMiddleware
+
+	contexts []*eventContext
 }
 
-func (c *eventContext) Route(e Event) (eventRoute, bool) {
-	for _, event := range c.events {
-		if event.Event() == e.Event() {
-			var handlers []eventHandlerRoute
-			for _, handler := range c.handlers {
-				handlers = append(handlers, eventHandlerRoute{
-					handler: handler,
-				})
-			}
-			return eventRoute{
-				event:    event,
-				handlers: handlers,
-			}, true
+func (c *eventContext) Route(e Event) eventRoute {
+	r := eventRoute{event: e}
+
+	if c.handlesEvent(e) {
+		for _, handler := range c.handlers {
+			r.handlers = append(r.handlers, eventHandlerRoute{
+				handler: handler,
+			})
 		}
 	}
-	return eventRoute{}, false
+
+	for _, ctx := range c.contexts {
+		r = r.Merge(ctx.Route(e))
+	}
+
+	for i := range r.handlers {
+		r.handlers[i].middleware = append(r.handlers[i].middleware, c.middleware...)
+	}
+
+	return r
+}
+
+func (c *eventContext) handlesEvent(e Event) bool {
+	for _, event := range c.events {
+		if event.Event() == e.Event() {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *eventContext) Event(events ...Event) eventBuilderHandled {
-	e.events = append(e.events, events...)
-	return e
+	c := new(eventContext)
+	c.events = events
+	e.contexts = append(e.contexts, c)
+	return c
 }
 
 func (e *eventContext) Handler(handlers ...EventHandler) eventBuilderListener {
-	e.handlers = append(e.handlers, handlers...)
-	return e
+	c := new(eventContext)
+	c.handlers = handlers
+	e.contexts = append(e.contexts, c)
+	return c
 }
 
 func (e *eventContext) Handled(handlers ...EventHandler) {
-	e.Handler(handlers...)
+	e.handlers = append(e.handlers, handlers...)
 }
 
 func (e *eventContext) Listens(events ...Event) {
-	e.Event(events...)
+	e.events = append(e.events, events...)
+}
+
+func (e *eventContext) Use(mw ...EventMiddleware) {
+	e.middleware = append(e.middleware, mw...)
+}
+
+func (e *eventContext) With(mw ...EventMiddleware) eventBuilderRouteStarter {
+	c := new(eventContext)
+	c.middleware = mw
+	e.contexts = append(e.contexts, c)
+	return c
+}
+
+func (e *eventContext) Group(fn func(EventBuilder)) {
+	c := new(eventContext)
+	fn(c)
+	e.contexts = append(e.contexts, c)
 }
