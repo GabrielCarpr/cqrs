@@ -7,9 +7,6 @@ import (
 
 // Queue allows the bus to queue messages for asynchronous execution
 type Queue interface {
-	// RegisterCtxKey allows serialization of contexts by registering a key and context
-	RegisterCtxKey(key interface{ String() string }, fn func([]byte) interface{})
-
 	// Publish publishes a message to the queue
 	// blocking until the message has been published
 	Publish(context.Context, ...message.Message) error

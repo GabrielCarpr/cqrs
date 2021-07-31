@@ -3,18 +3,16 @@ package app
 import (
 	"example/internal/config"
 	"github.com/GabrielCarpr/cqrs/auth"
-	"github.com/GabrielCarpr/cqrs/errors"
 	"github.com/GabrielCarpr/cqrs/bus"
 	"github.com/GabrielCarpr/cqrs/log"
 	"github.com/GabrielCarpr/cqrs/bus/queue/sql"
 	"github.com/GabrielCarpr/cqrs/ports"
+	pgEventStore "github.com/GabrielCarpr/cqrs/eventstore/postgres"
 	"example/rest"
 	"example/users"
 	"context"
-	"encoding/json"
 	//"fmt"
 	"github.com/google/uuid"
-	stdlog "log"
 	"os/signal"
 	"os"
 
@@ -26,6 +24,16 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
+
+// Takes the event store from the DI container and uses it in the bus.
+// Necessary was we want to use the event store in repositories too
+func useContainerEventStore(name string) bus.Config {
+	return func(b *bus.Bus) error {
+		s := b.Get(name).(bus.EventStore)
+		conf := bus.UseEventStore(s)
+		return conf(b)
+	}
+}
 
 var Modules = []bus.Module{
 	users.Users{},
@@ -44,21 +52,13 @@ func Make(ctx context.Context) *App {
 	})
 
 	// Bus setup
-	b := bus.Default(ctx, Modules, bus.UseQueue(queue))
+	b := bus.Default(ctx, Modules, bus.UseQueue(queue), useContainerEventStore("event-store"))
 	b.Use(
 		auth.CommandAuthGuard,
 		auth.QueryAuthGuard,
-		errors.CommandErrorMiddleware,
-		errors.QueryErrorMiddleware,
 	)
-	b.RegisterContextKey(auth.AuthCtxKey, func(j []byte) interface{} {
-		var v auth.Credentials
-		json.Unmarshal(j, &v)
-		return v
-	})
-	b.RegisterContextKey(log.CtxIDKey, func(j []byte) interface{} {
-		return uuid.MustParse(string(j))
-	})
+	bus.RegisterContextKey(auth.AuthCtxKey, auth.Credentials{})
+	bus.RegisterContextKey(log.CtxIDKey, uuid.New())
 
 	app := App{Bus: b, ctx: ctx}
 	return &app
@@ -73,11 +73,16 @@ func (a *App) Handle() {
 	restServer := rest.Rest(a.Bus, config.Values)
 	p := ports.Ports{restServer}
 
-	stdlog.Fatal(p.Run(a.ctx))
+	err := p.Run(a.ctx)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (a *App) Work() {
-	a.Bus.Work()
+	if err := a.Bus.Run(); err != nil {
+		panic(err)
+	}
 }
 
 func (a *App) Delete() {
@@ -139,6 +144,24 @@ var Main = bus.FuncModule{
 				},
 				Unshared: true,
 			},*/
+
+			{
+				Name: "event-store",
+				Build: func(ctn di.Container) (interface{}, error) {
+					c := pgEventStore.Config{
+						DBName: config.Values.DBName,
+						DBUser: config.Values.DBUser,
+						DBHost: config.Values.DBHost,
+						DBPass: config.Values.DBPass,
+					}
+					store := pgEventStore.New(c)
+					return store, nil
+				},
+				Close: func(obj interface{}) error {
+					s := obj.(bus.EventStore)
+					return s.Close()
+				},
+			},
 		}
 	},
 }

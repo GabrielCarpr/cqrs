@@ -69,7 +69,8 @@ func (h UpdateRoleHandler) Execute(ctx context.Context, c bus.Command) (res bus.
 		role = role.DropScopes().ApplyScopes(*cmd.Scopes...)
 	}
 
-	events := role.Commit()
+	events := role.Messages(ctx)
+	role.Commit()
 	err = h.roles.Persist(role)
 	switch err {
 	case nil:

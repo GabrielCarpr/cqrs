@@ -50,9 +50,7 @@ type QueueIntegrationTest struct {
 
 func (s *QueueIntegrationTest) SetupTest() {
 	sql.ResetSQLDB(TestConfig.DBDsn())
-	s.queue.RegisterCtxKey(log.CtxIDKey, func(b []byte) interface{} {
-		return uuid.MustParse(string(b))
-	})
+	bus.RegisterContextKey(log.CtxIDKey, uuid.Nil)
 	gob.Register(testCmd{})
 }
 

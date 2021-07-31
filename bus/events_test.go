@@ -1,6 +1,7 @@
 package bus_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -22,21 +23,22 @@ func (TestEvent) Event() string {
 
 func TestEventBufferCommits(t *testing.T) {
 	owner := uuid.New()
-	queue := bus.NewEventBuffer(owner)
+	queue := bus.NewEventBuffer(owner, "lol")
 
 	e := &TestEvent{Payload: "Hi"}
 	e2 := &TestEvent{Payload: "Bye"}
 	queue.Buffer(true, e, e2)
 
-	events := queue.Commit()
+	events := queue.Events(context.Background())
+	queue.Commit()
 	assert.Len(t, events, 2)
-	assert.Len(t, queue.Events(), 0)
+	assert.Len(t, queue.Events(context.Background()), 0)
 	event := events[0].(*TestEvent)
 	assert.Equal(t, owner.String(), event.Owner)
 }
 
 func TestEventBufferVersions(t *testing.T) {
-	queue := bus.NewEventBuffer(uuid.New())
+	queue := bus.NewEventBuffer(uuid.New(), "lol")
 	require.Equal(t, int64(0), queue.Version)
 
 	e := &TestEvent{Payload: "Hi"}
@@ -48,7 +50,8 @@ func TestEventBufferVersions(t *testing.T) {
 	require.Equal(t, int64(1), queue.Version)
 	require.Equal(t, int64(2), queue.PendingVersion())
 
-	msgs := queue.Commit()
+	msgs := queue.Events(context.Background())
+	queue.Commit()
 	require.Len(t, msgs, 1)
 	require.Equal(t, int64(2), queue.Version)
 	require.Equal(t, int64(2), queue.PendingVersion())
@@ -73,7 +76,7 @@ func newTestEntity() testEntity {
 	ID := uuid.New()
 	e := testEntity{
 		ID:          ID,
-		EventBuffer: bus.NewEventBuffer(ID),
+		EventBuffer: bus.NewEventBuffer(ID, "testEntity"),
 	}
 	return e
 }
@@ -114,7 +117,13 @@ func TestApplyChange(t *testing.T) {
 	require.Equal(t, int64(0), entity.Version)
 	require.Equal(t, int64(1), entity.PendingVersion())
 
+	events := entity.Events(context.Background())
 	entity.Commit()
+	require.Equal(t, "test.name.changed", events[0].Event())
+	require.Equal(t, int64(1), events[0].Versioned())
+	require.False(t, events[0].WasPublishedAt().IsZero())
+	require.Equal(t, "testEntity", events[0].FromAggregate())
+	require.Equal(t, entity.ID.String(), events[0].Owned())
 
 	require.Equal(t, int64(1), entity.CurrentVersion())
 }
@@ -137,4 +146,15 @@ func TestLoadFromData(t *testing.T) {
 	require.Equal(t, int64(3), entity.Version)
 	require.Equal(t, "Harry Potter", entity.Name)
 	require.Equal(t, int64(3), entity.PendingVersion())
+}
+
+func TestApplyCtxToEvent(t *testing.T) {
+	bus.RegisterContextKey(stringKey, "")
+	ctx := context.WithValue(context.Background(), stringKey, "hi")
+	buffer := bus.NewEventBuffer(uuid.New(), "test")
+
+	buffer.Buffer(true, &TestEvent{Payload: "lol"})
+
+	e := buffer.Events(ctx)[0].(*TestEvent)
+	require.Equal(t, "hi", e.Metadata["stringKey"])
 }

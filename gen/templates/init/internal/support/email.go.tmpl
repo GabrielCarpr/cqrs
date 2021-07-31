@@ -27,6 +27,10 @@ func (e Email) MarshalJSON() ([]byte, error) {
 	return json.Marshal(e.Email)
 }
 
+func (e *Email) UnmarshalJSON(data []byte) error {
+	return json.Unmarshal(data, &e.Email)
+}
+
 func (e *Email) Bind(data interface{}) error {
 	(*e).Email = data.(string)
 	return nil

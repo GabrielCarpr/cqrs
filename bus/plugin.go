@@ -7,12 +7,9 @@ type Plugin interface {
 	// Close shuts the plugin down
 	Close() error
 
-	// Work runs the worker in a goroutine, blocking
-	Work(context.Context) error
+	// Register registers the bus with a plugin
+	Register(*Bus) error
 
-	// Middleware returns any injected middlewares from the plugin
-	Middleware() []interface{}
-
-	// Attach gives the plugin a way to dispatch commands
-	Attach(func(context.Context, Command) error)
+	// Run runs the plugin, blocking
+	Run(context.Context) error
 }

@@ -2,16 +2,14 @@ package bus
 
 import (
 	"context"
-	"encoding/gob"
 	"fmt"
-	stdlog "log"
 	"os"
 	"os/signal"
 	"reflect"
 
 	"github.com/GabrielCarpr/cqrs/bus/message"
 	"github.com/GabrielCarpr/cqrs/log"
-	"golang.org/x/sync/errgroup"
+	"github.com/GabrielCarpr/cqrs/ports"
 
 	"github.com/sarulabs/di/v2"
 )
@@ -26,6 +24,9 @@ func Default(ctx context.Context, mods []Module, configs ...Config) *Bus {
 		QueryValidationGuard,
 		CommandLoggingMiddleware,
 		QueryLoggingMiddleware,
+		CommandErrorMiddleware,
+		QueryErrorMiddleware,
+		EventLoggingMiddleware,
 	)
 	return b
 }
@@ -43,7 +44,7 @@ func New(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 		}
 	}
 	c := builder.Build()
-	gob.Register(queuedEvent{})
+	RegisterMessage(QueuedEvent{})
 
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, os.Kill)
 	b := &Bus{
@@ -63,7 +64,7 @@ func New(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 	}
 
 	for _, bc := range bcs {
-		b.ExtendEvents(bc.EventRules())
+		b.routes.ExtendEvents(bc.Events)
 		b.routes.ExtendCommands(bc.Commands)
 		b.routes.ExtendQueries(bc.Queries)
 	}
@@ -82,16 +83,18 @@ func New(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 // messages and routes them to the correct place either synchronously
 // or asynchronously
 type Bus struct {
-	routes    MessageRouter
-	container di.Container
-	queue     Queue
-	ctx       context.Context
-	ctxCancel context.CancelFunc
+	routes     MessageRouter
+	container  di.Container
+	queue      Queue
+	eventStore EventStore
+	ctx        context.Context
+	ctxCancel  context.CancelFunc
 
 	commandGuards     []CommandGuard
 	queryGuards       []QueryGuard
 	commandMiddleware []CommandMiddleware
 	queryMiddleware   []QueryMiddleware
+	eventMiddleware   []EventMiddleware
 
 	plugins []Plugin
 }
@@ -110,31 +113,34 @@ func (b *Bus) Close() {
 	Instance = nil
 }
 
-// Work runs the bus in subscribe mode, to be ran as on a worker
+// Run runs the bus in subscribe mode, to be ran as on a worker
 // node, or in the background on an API server
-func (b *Bus) Work() {
-	group, ctx := errgroup.WithContext(b.ctx)
+func (b *Bus) Run() error {
+	ps := ports.Ports{}
+	if b.queue != nil {
+		ps = ps.PortFunc(func(c context.Context) error {
+			b.queue.Subscribe(c, b.routeFromQueue)
+			return nil
+		})
+	}
+	if b.eventStore != nil && b.queue != nil {
+		ps = ps.PortFunc(func(c context.Context) error {
+			return b.eventStore.Subscribe(c, func(e Event) error {
+				return b.publish(context.Background(), e)
+			})
+		})
+	}
 
 	for _, plugin := range b.plugins {
-		group.Go(func() error {
-			err := plugin.Work(ctx)
-			return err
-		})
+		ps = ps.Append(plugin)
 	}
 
-	group.Go(func() error {
-		// The queue blocks. The ctx will signal cancellation, and then it will unblock
-		b.queue.Subscribe(b.ctx, func(ctx context.Context, msg message.Message) error {
-			return b.routeFromQueue(ctx, msg)
-		})
-		return nil
-	})
-
-	if err := group.Wait(); err != nil {
-		b.Close()
-		panic(err)
+	if err := ps.Run(b.ctx); err != nil {
+		return log.Error(b.ctx, "bus.Run produced error", log.F{"error": err.Error()})
 	}
+
 	b.Close()
+	return nil
 }
 
 // Get returns an (unscoped) service from the container
@@ -155,25 +161,13 @@ func (b *Bus) Get(key interface{}) interface{} {
 func (b *Bus) RegisterPlugins(plugins ...Plugin) {
 	for _, plugin := range plugins {
 		b.plugins = append(b.plugins, plugin)
-		b.Use(plugin.Middleware()...)
-		plugin.Attach(func(ctx context.Context, c Command) error {
-			_, err := b.Dispatch(ctx, c, false)
-			return err
-		})
+		plugin.Register(b)
 	}
 }
 
 // ExtendEvents extends the Bus EventRules
-func (b *Bus) ExtendEvents(rules ...EventRules) *Bus {
-	for _, rule := range rules {
-		b.routes.Extend(rule)
-		for event := range rule {
-			stdlog.Printf("Registered event with gob: %s", event.Event())
-			gob.Register(event)
-			gob.Register(&event)
-		}
-	}
-	return b
+func (b *Bus) ExtendEvents(fn func(EventBuilder)) {
+	b.routes.ExtendEvents(fn)
 }
 
 func (b *Bus) ExtendCommands(fn func(CmdBuilder)) {
@@ -182,11 +176,6 @@ func (b *Bus) ExtendCommands(fn func(CmdBuilder)) {
 
 func (b *Bus) ExtendQueries(fn func(QueryBuilder)) {
 	b.routes.ExtendQueries(fn)
-}
-
-// RegisterContextKey registers a context key interpretation value for serialization
-func (b *Bus) RegisterContextKey(key interface{ String() string }, fn func(j []byte) interface{}) {
-	b.queue.RegisterCtxKey(key, fn)
 }
 
 // Use registers middleware and guards. Accepts a union of command/query guards and middleware.
@@ -205,6 +194,8 @@ func (b *Bus) Use(ms ...interface{}) {
 		case QueryMiddleware:
 			b.queryMiddleware = append(b.queryMiddleware, v)
 			break
+		case EventMiddleware:
+			b.eventMiddleware = append(b.eventMiddleware, v)
 		default:
 			panic(fmt.Sprint("Not a valid middleware, is ", reflect.TypeOf(v)))
 		}
@@ -218,7 +209,7 @@ func (b *Bus) routeFromQueue(ctx context.Context, msg message.Message) error {
 	case Command:
 		_, err = b.Dispatch(ctx, v, true)
 		break
-	case queuedEvent:
+	case QueuedEvent:
 		msgs, err = b.handleEvent(ctx, v, false)
 		break
 	}
@@ -275,6 +266,9 @@ func (b *Bus) Dispatch(ctx context.Context, cmd Command, sync bool) (*CommandRes
 	for _, mw := range b.commandMiddleware {
 		handler = mw(handler)
 	}
+	for _, mw := range route.Middleware {
+		handler = mw(handler)
+	}
 
 	log.Info(ctx, "Routed command", log.F{"command": cmd.Command(), "handler": handlerName})
 
@@ -300,11 +294,28 @@ func (b *Bus) runCmdGuards(ctx context.Context, cmd Command) (context.Context, C
 
 // Publish distributes one or more events to the system
 func (b *Bus) Publish(ctx context.Context, events ...Event) error {
-	var queueables []queuedEvent
+	if b.eventStore != nil {
+		log.Info(ctx, "publishing events to store", log.F{"count": fmt.Sprint(len(events))})
+		err := b.eventStore.Append(ctx, Any, events...)
+		if err != nil {
+			return log.Error(ctx, "failed publishing events to event store", log.F{"err": err.Error()})
+		}
+	}
+
+	log.Info(ctx, "publishing events to queue", log.F{"count": fmt.Sprint(len(events))})
+	return b.publish(ctx, events...)
+}
+
+func (b *Bus) publish(ctx context.Context, events ...Event) error {
+	var queueables []QueuedEvent
 	for _, event := range events {
-		handlerNames := b.routes.RouteEvent(event)
-		for _, name := range handlerNames {
-			queueables = append(queueables, queuedEvent{event, name})
+		log.Info(ctx, "fanning out event", log.F{"event": event.Event()})
+		route := b.routes.RouteEvent(event)
+		for _, handler := range route.handlers {
+			queueables = append(queueables, QueuedEvent{
+				Event:   route.event,
+				Handler: EventHandlerName(handler.handler),
+			})
 		}
 	}
 
@@ -345,6 +356,10 @@ func (b *Bus) Query(ctx context.Context, query Query, result interface{}) error 
 	for _, mw := range b.queryMiddleware {
 		handler = mw(handler)
 	}
+	for _, mw := range route.Middleware {
+		handler = mw(handler)
+	}
+
 	return handler.Execute(ctx, query, result)
 }
 
@@ -360,22 +375,34 @@ func (b *Bus) runQueryGuards(ctx context.Context, q Query) (context.Context, Que
 }
 
 // handleEvent handles a queued event
-func (b *Bus) handleEvent(ctx context.Context, e queuedEvent, allowAsync bool) ([]message.Message, error) {
+func (b *Bus) handleEvent(ctx context.Context, e QueuedEvent, async bool) ([]message.Message, error) {
 	handler := b.container.Get(e.Handler).(EventHandler)
-	if allowAsync && handler.Async() {
-		log.Info(ctx, "Queuing event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(e.Handler).String()})
+	if async {
+		log.Info(ctx, "queuing event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(e.Handler).String()})
 		err := b.queue.Publish(ctx, e)
 		return []message.Message{}, err
 	}
-	log.Info(ctx, "Handling event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(handler).String()})
+	log.Info(ctx, "handling event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(handler).String()})
+
+	route, ok := b.routes.EventHandlerRoute(e.Event, handler)
+	if !ok {
+		return []message.Message{}, log.Error(ctx, "handler does not handler event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(handler).String()})
+	}
+	for _, mw := range b.eventMiddleware {
+		handler = mw(handler)
+	}
+	for _, mw := range route.middleware {
+		handler = mw(handler)
+	}
+
 	return handler.Handle(ctx, e.Event)
 }
 
-type queuedEvent struct {
+type QueuedEvent struct {
 	Event   Event
 	Handler string
 }
 
-func (queuedEvent) MessageType() message.Type {
+func (QueuedEvent) MessageType() message.Type {
 	return message.QueuedEvent
 }

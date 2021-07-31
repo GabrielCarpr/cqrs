@@ -1,18 +1,17 @@
 package sql
 
 import (
-	"bytes"
 	"context"
 	stdSQL "database/sql"
-	"encoding/gob"
 	"fmt"
-	"github.com/GabrielCarpr/cqrs/log"
 	stdlog "log"
 	"time"
 
+	"github.com/GabrielCarpr/cqrs/bus"
+	"github.com/GabrielCarpr/cqrs/log"
+
 	_ "github.com/lib/pq"
 
-	ctxSx "github.com/GabrielCarpr/cqrs/bus/context"
 	"github.com/GabrielCarpr/cqrs/bus/message"
 
 	"github.com/ThreeDotsLabs/watermill"
@@ -37,7 +36,7 @@ func makeDB(c Config) *stdSQL.DB {
 
 func NewSQLQueue(c Config) *SQLQueue {
 	db := makeDB(c)
-	logger := watermill.NewStdLogger(false, false)
+	logger := watermill.NopLogger{}
 	publisher, err := sql.NewPublisher(
 		db,
 		sql.PublisherConfig{
@@ -49,14 +48,13 @@ func NewSQLQueue(c Config) *SQLQueue {
 	if err != nil {
 		panic(err)
 	}
-	return &SQLQueue{db, logger, publisher, ctxSx.NewContextSerializer()}
+	return &SQLQueue{db, logger, publisher}
 }
 
 type SQLQueue struct {
-	db            *stdSQL.DB
-	logger        watermill.LoggerAdapter
-	publisher     wmMessage.Publisher
-	ctxSerializer *ctxSx.ContextSerializer
+	db        *stdSQL.DB
+	logger    watermill.LoggerAdapter
+	publisher wmMessage.Publisher
 }
 
 func (q *SQLQueue) Close() {
@@ -64,29 +62,25 @@ func (q *SQLQueue) Close() {
 	q.publisher.Close()
 }
 
-func (q *SQLQueue) RegisterCtxKey(key interface{ String() string }, fn func([]byte) interface{}) {
-	q.ctxSerializer.Register(key, fn)
-}
-
 func (q *SQLQueue) fromMessage(ctx context.Context, msg message.Message) (*wmMessage.Message, error) {
-	var payload bytes.Buffer
-	enc := gob.NewEncoder(&payload)
-	err := enc.Encode(&msg)
+	payload, err := bus.SerializeMessage(msg, bus.Gob)
 	if err != nil {
 		return nil, err
 	}
 
-	result := wmMessage.NewMessage(watermill.NewUUID(), payload.Bytes())
-	result.Metadata = wmMessage.Metadata(q.ctxSerializer.Serialize(ctx))
+	result := wmMessage.NewMessage(watermill.NewUUID(), payload)
+	result.Metadata = wmMessage.Metadata(bus.SerializeContext(ctx))
 	return result, nil
 }
 
 func (q *SQLQueue) toMessage(msg *wmMessage.Message) (context.Context, message.Message, error) {
-	var result message.Message
-	dec := gob.NewDecoder(bytes.NewBuffer(msg.Payload))
-	err := dec.Decode(&result)
+	result, err := bus.DeserializeMessage(msg.Payload)
+	if err != nil {
+		return context.Background(), result, err
+	}
+
 	metadata := map[string]string(msg.Metadata)
-	return q.ctxSerializer.Deserialize(context.Background(), metadata), result, err
+	return bus.DeserializeContext(context.Background(), metadata), result, err
 }
 
 func (q *SQLQueue) Subscribe(topCtx context.Context, fn func(context.Context, message.Message) error) {
@@ -137,14 +131,14 @@ func (q *SQLQueue) Subscribe(topCtx context.Context, fn func(context.Context, me
 }
 
 func (q *SQLQueue) process(fn func(context.Context, message.Message) error, msg *wmMessage.Message) (err error) {
-	ctx, input, err := q.toMessage(msg)
-
 	defer func() {
 		if r := recover(); r != nil {
 			msg.Nack()
-			err = log.Error(ctx, fmt.Errorf("Panicked running message: %v", r), log.F{})
+			err = log.Error(context.Background(), fmt.Errorf("Panicked running message: %v", r), log.F{})
 		}
 	}()
+
+	ctx, input, err := q.toMessage(msg)
 
 	log.Info(ctx, "Received message", log.F{"ID": msg.UUID})
 	if err != nil {
@@ -169,9 +163,9 @@ func (q *SQLQueue) Publish(ctx context.Context, msgs ...message.Message) error {
 		if err != nil {
 			return err
 		}
-		deliver.Metadata = wmMessage.Metadata(q.ctxSerializer.Serialize(ctx))
+		deliver.Metadata = wmMessage.Metadata(bus.SerializeContext(ctx))
 
-		log.Info(ctx, "Publishing message", log.F{"ID": deliver.UUID})
+		log.Info(ctx, "publishing message", log.F{"ID": deliver.UUID})
 		err = q.publisher.Publish("messages", deliver)
 		if err != nil {
 			return err

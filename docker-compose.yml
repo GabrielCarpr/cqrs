@@ -35,5 +35,26 @@ services:
       PORT: "80"
     command: ["bash", "-c", "cd _example; go run example"]
 
+  go-worker:
+    image: golang:1.16.5
+    volumes:
+      - ./:/src
+      - ./_example/migrations:/var/migrations
+      - go-deps:/go/pkg
+    working_dir: /src
+    depends_on: 
+      - db
+    environment:
+      ENVIRONMENT: "development"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      DB_USER: "cqrs"
+      DB_NAME: "cqrs"
+      DB_PASS: "cqrs"
+      SECRET_KEY: "secret"
+      MIGRATIONS: "/src/_example/migrations"
+      PORT: "80"
+    command: ["bash", "-c", "cd _example; go run example -mode=worker"]
+
 volumes:
   go-deps: {}

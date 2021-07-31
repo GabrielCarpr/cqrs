@@ -7,6 +7,7 @@ import (
 	"example/users/commands"
 	"example/users/db"
 	"example/users/queries"
+	"example/users/entities"
 
 	"gorm.io/gorm"
 
@@ -30,8 +31,16 @@ func (u Users) Queries(b bus.QueryBuilder) {
     b.Query(queries.Role{}).Handled(queries.RoleHandler{})
 }
 
-func (u Users) EventRules() bus.EventRules {
-    return bus.EventRules{}
+func (u Users) Events(b bus.EventBuilder) {
+	b.Event(
+		&entities.UserCreated{},
+		&entities.UserDetailsChanged{},
+		&entities.UserGrantedRole{},
+		&entities.UserRevokedRole{},
+		&entities.UserRevokedAllRoles{},
+		&entities.RoleCreated{},
+		&entities.RoleScopeApplied{},
+	)
 }
 
 func (u Users) Services() []bus.Def {
