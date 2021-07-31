@@ -5,11 +5,13 @@ package bus_test
 import (
 	"context"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/GabrielCarpr/cqrs/bus"
 	"github.com/GabrielCarpr/cqrs/bus/message"
 	"github.com/GabrielCarpr/cqrs/bus/queue/sql"
-	"testing"
-	"time"
+	"github.com/GabrielCarpr/cqrs/eventstore/postgres"
 
 	"github.com/sarulabs/di/v2"
 	"github.com/stretchr/testify/assert"
@@ -162,15 +164,21 @@ func TestBusHandlesEvent(t *testing.T) {
 		},
 	})*/
 	module.Defs = append(module.Defs, bus.Def{
-		Name: "event-async-handler",
+		Name: asyncTestEventHandler{},
 		Build: func(ctn di.Container) (interface{}, error) {
 			return async, nil
 		},
 	})
 	q := sql.NewSQLQueue(testConfig)
-	b := bus.New(ctx, []bus.Module{module}, bus.UseQueue(q))
-	b.ExtendEvents(bus.EventRules{
-		&testEvent{}: []string{"event-async-handler"},
+	s := postgres.New(postgres.Config{
+		DBName: testConfig.DBName,
+		DBHost: testConfig.DBHost,
+		DBUser: testConfig.DBUser,
+		DBPass: testConfig.DBPass,
+	})
+	b := bus.New(ctx, []bus.Module{module}, bus.UseQueue(q), bus.UseEventStore(s))
+	b.ExtendEvents(func(b bus.EventBuilder) {
+		b.Event(&testEvent{}).Handled(asyncTestEventHandler{})
 	})
 
 	err := b.Publish(context.Background(), &testEvent{Value: "Hello world"})
@@ -180,7 +188,8 @@ func TestBusHandlesEvent(t *testing.T) {
 	//assert.Equal(t, "Hello world", syncResult)
 	//assert.Empty(t, asyncResult)
 
-	b.Run()
+	err = b.Run()
+	assert.NoError(t, err)
 	assert.Equal(t, "Hello world", asyncResult)
 }
 

@@ -44,7 +44,7 @@ func New(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 		}
 	}
 	c := builder.Build()
-	RegisterMessage(queuedEvent{})
+	RegisterMessage(QueuedEvent{})
 
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, os.Kill)
 	b := &Bus{
@@ -113,15 +113,17 @@ func (b *Bus) Close() {
 	Instance = nil
 }
 
-// Work runs the bus in subscribe mode, to be ran as on a worker
+// Run runs the bus in subscribe mode, to be ran as on a worker
 // node, or in the background on an API server
 func (b *Bus) Run() error {
 	ps := ports.Ports{}
-	ps = ps.PortFunc(func(c context.Context) error {
-		b.queue.Subscribe(c, b.routeFromQueue)
-		return nil
-	})
-	if b.eventStore != nil {
+	if b.queue != nil {
+		ps = ps.PortFunc(func(c context.Context) error {
+			b.queue.Subscribe(c, b.routeFromQueue)
+			return nil
+		})
+	}
+	if b.eventStore != nil && b.queue != nil {
 		ps = ps.PortFunc(func(c context.Context) error {
 			return b.eventStore.Subscribe(c, func(e Event) error {
 				return b.publish(context.Background(), e)
@@ -134,7 +136,7 @@ func (b *Bus) Run() error {
 	}
 
 	if err := ps.Run(b.ctx); err != nil {
-		return err
+		return log.Error(b.ctx, "bus.Run produced error", log.F{"error": err.Error()})
 	}
 
 	b.Close()
@@ -207,7 +209,7 @@ func (b *Bus) routeFromQueue(ctx context.Context, msg message.Message) error {
 	case Command:
 		_, err = b.Dispatch(ctx, v, true)
 		break
-	case queuedEvent:
+	case QueuedEvent:
 		msgs, err = b.handleEvent(ctx, v, false)
 		break
 	}
@@ -293,23 +295,24 @@ func (b *Bus) runCmdGuards(ctx context.Context, cmd Command) (context.Context, C
 // Publish distributes one or more events to the system
 func (b *Bus) Publish(ctx context.Context, events ...Event) error {
 	if b.eventStore != nil {
-		log.Info(ctx, "publishing events to queue", log.F{"count": fmt.Sprint(len(events))})
+		log.Info(ctx, "publishing events to store", log.F{"count": fmt.Sprint(len(events))})
 		err := b.eventStore.Append(ctx, Any, events...)
 		if err != nil {
 			return log.Error(ctx, "failed publishing events to event store", log.F{"err": err.Error()})
 		}
 	}
 
-	log.Info(ctx, "publishing events to store", log.F{"count": fmt.Sprint(len(events))})
+	log.Info(ctx, "publishing events to queue", log.F{"count": fmt.Sprint(len(events))})
 	return b.publish(ctx, events...)
 }
 
 func (b *Bus) publish(ctx context.Context, events ...Event) error {
-	var queueables []queuedEvent
+	var queueables []QueuedEvent
 	for _, event := range events {
+		log.Info(ctx, "fanning out event", log.F{"event": event.Event()})
 		route := b.routes.RouteEvent(event)
 		for _, handler := range route.handlers {
-			queueables = append(queueables, queuedEvent{
+			queueables = append(queueables, QueuedEvent{
 				Event:   route.event,
 				Handler: EventHandlerName(handler.handler),
 			})
@@ -372,14 +375,14 @@ func (b *Bus) runQueryGuards(ctx context.Context, q Query) (context.Context, Que
 }
 
 // handleEvent handles a queued event
-func (b *Bus) handleEvent(ctx context.Context, e queuedEvent, async bool) ([]message.Message, error) {
+func (b *Bus) handleEvent(ctx context.Context, e QueuedEvent, async bool) ([]message.Message, error) {
 	handler := b.container.Get(e.Handler).(EventHandler)
 	if async {
 		log.Info(ctx, "queuing event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(e.Handler).String()})
 		err := b.queue.Publish(ctx, e)
 		return []message.Message{}, err
 	}
-	log.Info(ctx, "Handling event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(handler).String()})
+	log.Info(ctx, "handling event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(handler).String()})
 
 	route, ok := b.routes.EventHandlerRoute(e.Event, handler)
 	if !ok {
@@ -395,11 +398,11 @@ func (b *Bus) handleEvent(ctx context.Context, e queuedEvent, async bool) ([]mes
 	return handler.Handle(ctx, e.Event)
 }
 
-type queuedEvent struct {
+type QueuedEvent struct {
 	Event   Event
 	Handler string
 }
 
-func (queuedEvent) MessageType() message.Type {
+func (QueuedEvent) MessageType() message.Type {
 	return message.QueuedEvent
 }

@@ -19,11 +19,12 @@ type MessageRouter struct {
 	queryRoutes   queryRouting
 }
 
-// Extend takes EventRules|CommandRules|QueryRules and extends
-// the routers internal routing rules with it
 func (r *MessageRouter) ExtendEvents(fn func(b EventBuilder)) {
 	r.events.Group(fn)
 	r.eventRoutes = r.events.Render()
+	for _, route := range r.eventRoutes {
+		RegisterMessage(route.event)
+	}
 }
 
 func (r *MessageRouter) ExtendCommands(fn func(b CmdBuilder)) {
@@ -42,6 +43,7 @@ func (r MessageRouter) RouteEvent(e Event) eventRoute {
 	if !ok {
 		return r.events.Route(e)
 	}
+	route.event = e
 	return route
 }
 

@@ -86,9 +86,9 @@ func interfaceToError(msg interface{}, fields F) error {
 		err = errors.New(fmt.Sprint(v))
 	}
 
-	//for key, val := range fields {
-	//	err = fmt.Errorf("%w: %s: %s", err, key, val)
-	//}
+	for key, val := range fields {
+		err = fmt.Errorf("%w: %s: %s", err, key, val)
+	}
 
 	return err
 }

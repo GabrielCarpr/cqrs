@@ -210,6 +210,24 @@ func (s *SerializerSuite) TestSerializeEventAsJson() {
 	s.Equal("testEvent", e.Aggregate)
 }
 
+func (s *SerializerSuite) TestSerializesQueuedEventGob() {
+	bus.RegisterMessage(bus.QueuedEvent{})
+	bus.RegisterMessage(&testEventSerial{})
+	q := bus.QueuedEvent{
+		Handler: "handler",
+		Event:   &testEventSerial{Name: "test"},
+	}
+
+	data, err := bus.SerializeMessage(q, bus.Gob)
+	s.Require().NoError(err)
+
+	msg, err := bus.DeserializeMessage(data)
+	s.Require().NoError(err)
+	q = msg.(bus.QueuedEvent)
+	e := q.Event.(*testEventSerial)
+	s.Equal("test", e.Name)
+}
+
 func TestSerializer(t *testing.T) {
 	suite.Run(t, new(SerializerSuite))
 }

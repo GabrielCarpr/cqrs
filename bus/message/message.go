@@ -15,7 +15,7 @@ var (
 	Event Type = "event"
 	// QueuedEvent is an event that has been fanned out to a handler and has been
 	// or is ready to be queued
-	QueuedEvent Type = "queuedEvent"
+	QueuedEvent Type = "QueuedEvent"
 )
 
 // Message is a generic message that can be routed to an event or command handler
