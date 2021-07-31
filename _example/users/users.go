@@ -31,16 +31,16 @@ func (u Users) Queries(b bus.QueryBuilder) {
     b.Query(queries.Role{}).Handled(queries.RoleHandler{})
 }
 
-func (u Users) EventRules() bus.EventRules {
-    return bus.EventRules{
-		&entities.UserCreated{}: []string{},
-		&entities.UserDetailsChanged{}: []string{},
-		&entities.UserGrantedRole{}: []string{},
-		&entities.UserRevokedRole{}: []string{},
-		&entities.UserRevokedAllRoles{}: []string{},
-		&entities.RoleCreated{}: []string{},
-		&entities.RoleScopeApplied{}: []string{},
-	}
+func (u Users) Events(b bus.EventBuilder) {
+	b.Event(
+		&entities.UserCreated{},
+		&entities.UserDetailsChanged{},
+		&entities.UserGrantedRole{},
+		&entities.UserRevokedRole{},
+		&entities.UserRevokedAllRoles{},
+		&entities.RoleCreated{},
+		&entities.RoleScopeApplied{},
+	)
 }
 
 func (u Users) Services() []bus.Def {

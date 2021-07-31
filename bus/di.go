@@ -99,7 +99,7 @@ func (d Def) diDef() di.Def {
 
 // BoundedContext represents the integration between the main app and a BC.
 type Module interface {
-	EventRules() EventRules
+	Events(EventBuilder)
 	Commands(CmdBuilder)
 	Queries(QueryBuilder)
 
@@ -107,7 +107,7 @@ type Module interface {
 }
 
 type FuncModule struct {
-	EventsFunc   func() EventRules
+	EventsFunc   func(EventBuilder)
 	CommandsFunc func(CmdBuilder)
 	QueriesFunc  func(QueryBuilder)
 	ServicesFunc func() []Def
@@ -134,9 +134,8 @@ func (m FuncModule) Services() []Def {
 	return m.Defs
 }
 
-func (m FuncModule) EventRules() EventRules {
+func (m FuncModule) Events(b EventBuilder) {
 	if m.EventsFunc != nil {
-		return m.EventsFunc()
+		m.EventsFunc(b)
 	}
-	return EventRules{}
 }

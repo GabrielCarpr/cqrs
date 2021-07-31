@@ -3,7 +3,6 @@ package bus
 import (
 	"context"
 	"fmt"
-	stdlog "log"
 	"os"
 	"os/signal"
 	"reflect"
@@ -65,7 +64,7 @@ func New(ctx context.Context, bcs []Module, configs ...Config) *Bus {
 	}
 
 	for _, bc := range bcs {
-		b.ExtendEvents(bc.EventRules())
+		b.routes.ExtendEvents(bc.Events)
 		b.routes.ExtendCommands(bc.Commands)
 		b.routes.ExtendQueries(bc.Queries)
 	}
@@ -165,15 +164,8 @@ func (b *Bus) RegisterPlugins(plugins ...Plugin) {
 }
 
 // ExtendEvents extends the Bus EventRules
-func (b *Bus) ExtendEvents(rules ...EventRules) *Bus {
-	for _, rule := range rules {
-		b.routes.Extend(rule)
-		for event := range rule {
-			stdlog.Printf("Registered event: %s", event.Event())
-			RegisterMessage(event)
-		}
-	}
-	return b
+func (b *Bus) ExtendEvents(fn func(EventBuilder)) {
+	b.routes.ExtendEvents(fn)
 }
 
 func (b *Bus) ExtendCommands(fn func(CmdBuilder)) {
@@ -313,12 +305,14 @@ func (b *Bus) Publish(ctx context.Context, events ...Event) error {
 }
 
 func (b *Bus) publish(ctx context.Context, events ...Event) error {
-	log.Info(ctx, "fanning out events", log.F{"count": fmt.Sprint(len(events)), "first": events[0].Event()})
 	var queueables []queuedEvent
 	for _, event := range events {
-		handlerNames := b.routes.RouteEvent(event)
-		for _, name := range handlerNames {
-			queueables = append(queueables, queuedEvent{event, name})
+		route := b.routes.RouteEvent(event)
+		for _, handler := range route.handlers {
+			queueables = append(queueables, queuedEvent{
+				Event:   route.event,
+				Handler: EventHandlerName(handler.handler),
+			})
 		}
 	}
 
@@ -381,13 +375,20 @@ func (b *Bus) runQueryGuards(ctx context.Context, q Query) (context.Context, Que
 func (b *Bus) handleEvent(ctx context.Context, e queuedEvent, async bool) ([]message.Message, error) {
 	handler := b.container.Get(e.Handler).(EventHandler)
 	if async {
-		log.Info(ctx, "Queuing event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(e.Handler).String()})
+		log.Info(ctx, "queuing event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(e.Handler).String()})
 		err := b.queue.Publish(ctx, e)
 		return []message.Message{}, err
 	}
 	log.Info(ctx, "Handling event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(handler).String()})
 
+	route, ok := b.routes.EventHandlerRoute(e.Event, handler)
+	if !ok {
+		return []message.Message{}, log.Error(ctx, "handler does not handler event", log.F{"event": e.Event.Event(), "handler": reflect.TypeOf(handler).String()})
+	}
 	for _, mw := range b.eventMiddleware {
+		handler = mw(handler)
+	}
+	for _, mw := range route.middleware {
 		handler = mw(handler)
 	}
 

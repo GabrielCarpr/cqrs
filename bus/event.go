@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/GabrielCarpr/cqrs/bus/message"
@@ -233,4 +234,9 @@ func (e *EventBuffer) Commit() {
 // entity version
 func (e *EventBuffer) ForceVersion(v int64) {
 	e.Version = v
+}
+
+func EventHandlerName(h EventHandler) string {
+	t := reflect.TypeOf(h)
+	return fmt.Sprint(t.PkgPath(), ".", t.Name())
 }

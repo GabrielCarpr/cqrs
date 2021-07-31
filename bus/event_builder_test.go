@@ -30,6 +30,8 @@ import (
 
 type testEvent struct {
 	EventType
+
+	Num int
 }
 
 func (testEvent) Event() string {
@@ -180,4 +182,50 @@ func (s *EventBuilderSuite) TestGroupMiddleware() {
 	route = s.c.Route(&testEvent{})
 	s.Len(route.handlers, 1)
 	s.Len(route.handlers[0].middleware, 4)
+}
+
+func (s *EventBuilderSuite) TestMultiEventLevels() {
+	s.b.Event(&testEvent{}).Handled(testEventHandler{})
+	s.b.Group(func(b EventBuilder) {
+		s.b.Handler(otherTestEventHandler{}).Listens(&testEvent{})
+		s.b.Event(&testEvent{}).Handled(testEventHandler{})
+	})
+
+	route := s.c.Route(&testEvent{})
+	s.Len(route.handlers, 3)
+}
+
+func (s *EventBuilderSuite) TestGetHandlerMiddleware() {
+	s.b.Event(&testEvent{}).Handled(testEventHandler{})
+	s.b.Use(testEventMiddleware)
+	s.b.Group(func(b EventBuilder) {
+		b.Use(testEventMiddleware)
+		b.Handler(otherTestEventHandler{}).Listens(&testEvent{})
+	})
+
+	route, ok := s.c.HandlerRoute(&testEvent{}, otherTestEventHandler{})
+	s.Require().True(ok)
+	s.Len(route.middleware, 2)
+}
+
+func (s *EventBuilderSuite) TestRoutesCombine() {
+	s.b.Event(&testEvent{}).Handled(testEventHandler{})
+	s.b.Group(func(b EventBuilder) {
+		b.Handler(otherTestEventHandler{}).Listens(&testEvent{})
+	})
+
+	route := s.c.Route(&testEvent{})
+	s.Len(route.handlers, 2)
+}
+
+func (s *EventBuilderSuite) TestRender() {
+	s.b.Event(&testEvent{}).Handled(testEventHandler{})
+	s.b.Group(func(b EventBuilder) {
+		b.Handler(otherTestEventHandler{}).Listens(&testEvent{})
+	})
+
+	e := &testEvent{Num: 15}
+	routes := s.c.Render()
+	route := routes[e.Event()]
+	s.Len(route.handlers, 2)
 }

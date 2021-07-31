@@ -1,38 +1,9 @@
 package bus
 
-// EventRules is a map that determines routing for an event.
-// The key is the event name, and the value is a list of DI handler names.
-type EventRules map[Event][]string
-
-type eventRules map[string][]string
-
-func (r eventRules) Merge(rules EventRules) eventRules {
-	for event, handlers := range rules {
-		existing, _ := r[string(event.Event())]
-		r[string(event.Event())] = r.deduplicate(existing, handlers...)
-	}
-	return r
-}
-
-func (eventRules) deduplicate(existing []string, handlers ...string) []string {
-	merged := make([]string, len(existing))
-	copy(merged, existing)
-one:
-	for _, h := range handlers {
-		for _, e := range existing {
-			if e == h {
-				break one
-			}
-		}
-		merged = append(merged, h)
-	}
-	return merged
-}
-
 // NewMessageRouter returns a new, empty, message router
 func NewMessageRouter() MessageRouter {
 	return MessageRouter{
-		Events:   make(eventRules),
+		events:   *NewEventContext(),
 		commands: *NewCommandContext(),
 		queries:  *NewQueryContext(),
 	}
@@ -40,17 +11,19 @@ func NewMessageRouter() MessageRouter {
 
 // MessageRouter routes a message to its correct destination.
 type MessageRouter struct {
-	Events        eventRules
+	events        eventContext
 	commands      CommandContext
 	queries       QueryContext
+	eventRoutes   map[string]eventRoute
 	commandRoutes commandRouting
 	queryRoutes   queryRouting
 }
 
 // Extend takes EventRules|CommandRules|QueryRules and extends
 // the routers internal routing rules with it
-func (r *MessageRouter) Extend(rules EventRules) {
-	r.Events = r.Events.Merge(rules)
+func (r *MessageRouter) ExtendEvents(fn func(b EventBuilder)) {
+	r.events.Group(fn)
+	r.eventRoutes = r.events.Render()
 }
 
 func (r *MessageRouter) ExtendCommands(fn func(b CmdBuilder)) {
@@ -64,12 +37,16 @@ func (r *MessageRouter) ExtendQueries(fn func(b QueryBuilder)) {
 }
 
 // RouteEvent returns all the handlers for an event
-func (r MessageRouter) RouteEvent(e Event) []string {
-	handlers, ok := r.Events[string(e.Event())]
+func (r MessageRouter) RouteEvent(e Event) eventRoute {
+	route, ok := r.eventRoutes[e.Event()]
 	if !ok {
-		return []string{}
+		return r.events.Route(e)
 	}
-	return handlers
+	return route
+}
+
+func (r MessageRouter) EventHandlerRoute(e Event, h EventHandler) (eventHandlerRoute, bool) {
+	return r.events.HandlerRoute(e, h)
 }
 
 // RouteCommand returns the routing record for a command, if it exists

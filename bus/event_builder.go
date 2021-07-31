@@ -57,6 +57,10 @@ type eventHandlerRoute struct {
 
 var _ EventBuilder = (*eventContext)(nil)
 
+func NewEventContext() *eventContext {
+	return &eventContext{}
+}
+
 type eventContext struct {
 	events     []Event
 	handlers   []EventHandler
@@ -68,7 +72,7 @@ type eventContext struct {
 func (c *eventContext) Route(e Event) eventRoute {
 	r := eventRoute{event: e}
 
-	if c.handlesEvent(e) {
+	if c.handlesEvent(e.Event()) {
 		for _, handler := range c.handlers {
 			r.handlers = append(r.handlers, eventHandlerRoute{
 				handler: handler,
@@ -87,9 +91,53 @@ func (c *eventContext) Route(e Event) eventRoute {
 	return r
 }
 
-func (c *eventContext) handlesEvent(e Event) bool {
+func (c *eventContext) HandlerRoute(e Event, h EventHandler) (eventHandlerRoute, bool) {
+	route := c.Route(e)
+
+	for _, handler := range route.handlers {
+		if EventHandlerName(handler.handler) == EventHandlerName(h) {
+			return handler, true
+		}
+	}
+
+	return eventHandlerRoute{}, false
+}
+
+func (c *eventContext) Render() map[string]eventRoute {
+	events := c.Events()
+	result := make(map[string]eventRoute)
+
+	for _, event := range events {
+		result[event.Event()] = c.Route(event)
+	}
+
+	return result
+}
+
+func (c *eventContext) Events() []Event {
+	events := make(map[string]Event, 0)
 	for _, event := range c.events {
-		if event.Event() == e.Event() {
+		events[event.Event()] = event
+	}
+
+	for _, ctx := range c.contexts {
+		res := ctx.Events()
+		for _, event := range res {
+			events[event.Event()] = event
+		}
+	}
+
+	result := make([]Event, 0)
+	for _, event := range events {
+		result = append(result, event)
+	}
+
+	return result
+}
+
+func (c *eventContext) handlesEvent(name string) bool {
+	for _, event := range c.events {
+		if event.Event() == name {
 			return true
 		}
 	}
