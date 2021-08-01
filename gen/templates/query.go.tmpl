@@ -1,41 +1,43 @@
-package queries
+package {{ .Package }}
 
 import (
-    "api/pkg/cqrs"
+    "github.com/GabrielCarpr/cqrs/bus"
     "context"
-    "{{ .ReturnImport }}"
 )
 
 /** QUERY */
 
-type {{ .Name }} struct {
-    cqrs.QueryType
+type {{ .Struct }} struct {
+    bus.QueryType
 }
 
-func (q {{ .Name }}) Valid() error {
+func ({{ .Struct }}) Query() string {
+    return "{{ .Struct }}"
+}
+
+func (q {{ .Struct }}) Valid() error {
     return nil
 }
 
-func (q {{ .Name }}) Auth(ctx context.Context) [][]string {
+func (q {{ .Struct }}) Auth(ctx context.Context) [][]string {
     return [][]string{}
 }
 
 
 /** HANDLER */
 
-func New{{ .Name }}Handler() *{{ .Name }}Handler {
-    return &{{ .Name }}Handler{}
+func New{{ .Struct }}Handler() *{{ .Struct }}Handler {
+    return &{{ .Struct }}Handler{}
 }
 
-var _ = (*{{ .Name }}Handler)(nil)
+var _ = (*{{ .Struct }}Handler)(nil)
 
-type {{ .Name }}Handler struct {
+type {{ .Struct }}Handler struct {
 
 }
 
-func (h {{ .Name }}Handler) Execute(ctx context.Context, q cqrs.Query, r interface{}) error {
-    _= q.({{ .Name }})
-    _= r.({{ .ReturnStruct }})
+func (h {{ .Struct }}Handler) Execute(ctx context.Context, q bus.Query, r interface{}) error {
+    _= q.({{ .Struct }})
 
     return nil
 }

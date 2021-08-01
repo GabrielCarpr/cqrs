@@ -1,45 +1,45 @@
-package commands
+package {{ .Package }}
 
 import (
-    "api/pkg/cqrs"
-    "api/pkg/cqrs/message"
+    "github.com/GabrielCarpr/cqrs/bus"
+    "github.com/GabrielCarpr/cqrs/bus/message"
     "context"
 )
 
 /** COMMAND */
 
-type {{ .Name }} struct {
-    cqrs.CommandType
+type {{ .Struct }} struct {
+    bus.CommandType
 
 }
 
-func (c {{ .Name }}) CmdName() string {
-    return "{{ .String }}"
+func (c {{ .Struct }}) Command() string {
+    return "{{ .Struct }}"
 }
 
-func (c {{ .Name }}) Valid() error {
+func (c {{ .Struct }}) Valid() error {
     return nil
 }
 
-func (c {{ .Name }}) Auth(ctx context.Context) [][]string {
+func (c {{ .Struct }}) Auth(ctx context.Context) [][]string {
     return [][]string{}
 }
 
 
 /** HANDLER */
 
-var _ = (*{{ .Name }}Handler)(nil)
+var _ = (*{{ .Struct }}Handler)(nil)
 
-func New{{ .Name }}Handler() *{{ .Name }}Handler {
-    return &{{ .Name }}Handler{}
+func New{{ .Struct }}Handler() *{{ .Struct }}Handler {
+    return &{{ .Struct }}Handler{}
 }
 
-type {{ .Name }}Handler struct {
+type {{ .Struct }}Handler struct {
 
 }
 
-func (h *{{ .Name }}Handler) Execute(c cqrs.Command) (res cqrs.CommandResponse, msgs []message.Message) {
-    _= c.({{ .Name }})
+func (h *{{ .Struct }}Handler) Execute(c bus.Command) (res bus.CommandResponse, msgs []message.Message) {
+    _= c.({{ .Struct }})
 
     return
 }
