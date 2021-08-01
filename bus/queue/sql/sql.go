@@ -74,13 +74,17 @@ func (q *SQLQueue) fromMessage(ctx context.Context, msg message.Message) (*wmMes
 }
 
 func (q *SQLQueue) toMessage(msg *wmMessage.Message) (context.Context, message.Message, error) {
+	ctx := context.Background()
 	result, err := bus.DeserializeMessage(msg.Payload)
 	if err != nil {
 		return context.Background(), result, err
 	}
+	if event, ok := result.(bus.QueuedEvent); ok {
+		ctx = bus.DeserializeContext(ctx, bus.SerializedContext(event.Event.HasMetadata()))
+	}
 
 	metadata := map[string]string(msg.Metadata)
-	return bus.DeserializeContext(context.Background(), metadata), result, err
+	return bus.DeserializeContext(ctx, metadata), result, err
 }
 
 func (q *SQLQueue) Subscribe(topCtx context.Context, fn func(context.Context, message.Message) error) {
