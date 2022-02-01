@@ -2,7 +2,7 @@
 
 [![Go](https://github.com/GabrielCarpr/cqrs/actions/workflows/go.yml/badge.svg)](https://github.com/GabrielCarpr/cqrs/actions/workflows/go.yml)
 
-CQRS is a WIP Go application framework centered around a command, query and event bus. Multiple interface adapters are available (JSON, HTML, CLI, GraphQL. Some are complete, some aren't) to connect to the bus. The interface adapters are intended to be generated from configuration files, or from the source itself. The bus can also be extended using middleware and plugins, for instance there's a background jobs manager included, and an event store.
+CQRS is a WIP Go application framework centered around a command, query and event bus. Multiple interface adapters are provided (JSON, HTML, CLI, GraphQL. Some are complete, some aren't even started) to connect to the bus. The interface adapters are intended to be generated from configuration files, or from the source itself. The bus can also be extended using middleware and plugins, for instance there's a background jobs manager included, and an event store.
 
 A boilerplate application generator is also available:
 `go run github.com/gabrielcarpr/cqrs/gen init [application-name] [root=.]`
